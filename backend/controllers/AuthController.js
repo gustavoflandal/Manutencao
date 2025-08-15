@@ -1,0 +1,348 @@
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const { User } = require('../models');
+const AuthService = require('../services/AuthService');
+const logger = require('../config/logger');
+
+class AuthController {
+  // Registro de usuário (apenas para criar o primeiro admin)
+  async register(req, res, next) {
+    try {
+      const { nome, email, senha, codigo_admin } = req.body;
+
+      // Validação básica
+      if (!nome || !email || !senha) {
+        return res.status(400).json({
+          success: false,
+          message: 'Nome, email e senha são obrigatórios'
+        });
+      }
+
+      if (senha.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'A senha deve ter pelo menos 6 caracteres'
+        });
+      }
+
+      // Verificar se já existe algum usuário administrador
+      const adminExists = await User.findOne({
+        where: { perfil: 'administrador' }
+      });
+
+      // Se já existe admin e não forneceu código correto, bloquear
+      if (adminExists && codigo_admin !== 'SETUP_ADMIN_2025') {
+        return res.status(403).json({
+          success: false,
+          message: 'Registro não permitido. Sistema já possui administrador.'
+        });
+      }
+
+      // Verificar se email já existe
+      const existingUser = await User.findOne({
+        where: { email: email.toLowerCase() }
+      });
+
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'Este email já está em uso'
+        });
+      }
+
+      // Criar usuário (primeiro será admin, demais serão solicitantes)
+      const userData = {
+        nome: nome.trim(),
+        email: email.toLowerCase().trim(),
+        senha,
+        perfil: adminExists ? 'solicitante' : 'administrador',
+        ativo: true
+      };
+
+      const user = await User.create(userData);
+
+      logger.info(`Usuário registrado: ${user.email}`, {
+        userId: user.id,
+        perfil: user.perfil,
+        isFirstAdmin: !adminExists
+      });
+
+      res.status(201).json({
+        success: true,
+        message: `Usuário ${user.perfil} criado com sucesso`,
+        data: {
+          user: {
+            id: user.id,
+            nome: user.nome,
+            email: user.email,
+            perfil: user.perfil
+          }
+        }
+      });
+
+    } catch (error) {
+      logger.error('Erro no registro:', error);
+      next(error);
+    }
+  }
+
+  // Login de usuário
+  async login(req, res, next) {
+    try {
+      const { email, senha } = req.body;
+
+      // Validação básica
+      if (!email || !senha) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email e senha são obrigatórios'
+        });
+      }
+
+      // Buscar usuário por email
+      const user = await User.findOne({ 
+        where: { email: email.toLowerCase() },
+        attributes: ['id', 'nome', 'email', 'senha', 'perfil', 'ativo']
+      });
+
+      if (!user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Credenciais inválidas'
+        });
+      }
+
+      // Verificar se o usuário está ativo
+      if (!user.ativo) {
+        return res.status(401).json({
+          success: false,
+          message: 'Usuário inativo. Contate o administrador.'
+        });
+      }
+
+      // Verificar senha
+      const senhaValida = await user.validatePassword(senha);
+      if (!senhaValida) {
+        return res.status(401).json({
+          success: false,
+          message: 'Credenciais inválidas'
+        });
+      }
+
+      // Gerar tokens
+      const tokenData = {
+        id: user.id,
+        email: user.email,
+        perfil: user.perfil
+      };
+
+      const accessToken = AuthService.generateAccessToken(tokenData);
+      const refreshToken = AuthService.generateRefreshToken(tokenData);
+
+      // Atualizar último login
+      await user.update({ ultimo_login: new Date() });
+
+      // Log de sucesso
+      logger.info(`Login realizado: ${user.email}`, {
+        userId: user.id,
+        ip: req.ip
+      });
+
+      res.json({
+        success: true,
+        message: 'Login realizado com sucesso',
+        data: {
+          user: {
+            id: user.id,
+            nome: user.nome,
+            email: user.email,
+            perfil: user.perfil
+          },
+          accessToken,
+          refreshToken
+        }
+      });
+
+    } catch (error) {
+      logger.error('Erro no login:', error);
+      next(error);
+    }
+  }
+
+  // Refresh token
+  async refreshToken(req, res, next) {
+    try {
+      const { refreshToken } = req.body;
+
+      if (!refreshToken) {
+        return res.status(401).json({
+          success: false,
+          message: 'Refresh token é obrigatório'
+        });
+      }
+
+      // Verificar refresh token
+      const decoded = AuthService.verifyRefreshToken(refreshToken);
+      
+      // Buscar usuário para verificar se ainda está ativo
+      const user = await User.findByPk(decoded.id, {
+        attributes: ['id', 'email', 'perfil', 'ativo']
+      });
+
+      if (!user || !user.ativo) {
+        return res.status(401).json({
+          success: false,
+          message: 'Token inválido'
+        });
+      }
+
+      // Gerar novo access token
+      const tokenData = {
+        id: user.id,
+        email: user.email,
+        perfil: user.perfil
+      };
+
+      const newAccessToken = AuthService.generateAccessToken(tokenData);
+
+      res.json({
+        success: true,
+        message: 'Token renovado com sucesso',
+        data: {
+          accessToken: newAccessToken
+        }
+      });
+
+    } catch (error) {
+      if (error.name === 'JsonWebTokenError' || error.name === 'TokenExpiredError') {
+        return res.status(401).json({
+          success: false,
+          message: 'Token inválido ou expirado'
+        });
+      }
+      
+      logger.error('Erro no refresh token:', error);
+      next(error);
+    }
+  }
+
+  // Logout
+  async logout(req, res) {
+    try {
+      // Aqui poderia implementar blacklist de tokens se necessário
+      logger.info(`Logout realizado: ${req.user.email}`, {
+        userId: req.user.id,
+        ip: req.ip
+      });
+
+      res.json({
+        success: true,
+        message: 'Logout realizado com sucesso'
+      });
+    } catch (error) {
+      logger.error('Erro no logout:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro interno do servidor'
+      });
+    }
+  }
+
+  // Verificar token
+  async verify(req, res) {
+    try {
+      // Se chegou até aqui, o token é válido (passou pelo middleware de auth)
+      const user = await User.findByPk(req.user.id, {
+        attributes: ['id', 'nome', 'email', 'perfil', 'ativo']
+      });
+
+      if (!user || !user.ativo) {
+        return res.status(401).json({
+          success: false,
+          message: 'Usuário não encontrado ou inativo'
+        });
+      }
+
+      res.json({
+        success: true,
+        data: {
+          user: {
+            id: user.id,
+            nome: user.nome,
+            email: user.email,
+            perfil: user.perfil
+          }
+        }
+      });
+    } catch (error) {
+      logger.error('Erro na verificação de token:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro interno do servidor'
+      });
+    }
+  }
+
+  // Alterar senha
+  async changePassword(req, res, next) {
+    try {
+      const { senhaAtual, novaSenha } = req.body;
+      const userId = req.user.id;
+
+      // Validações
+      if (!senhaAtual || !novaSenha) {
+        return res.status(400).json({
+          success: false,
+          message: 'Senha atual e nova senha são obrigatórias'
+        });
+      }
+
+      if (novaSenha.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'A nova senha deve ter pelo menos 6 caracteres'
+        });
+      }
+
+      // Buscar usuário
+      const user = await User.findByPk(userId, {
+        attributes: ['id', 'email', 'senha']
+      });
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'Usuário não encontrado'
+        });
+      }
+
+      // Verificar senha atual
+      const senhaValida = await user.validatePassword(senhaAtual);
+      if (!senhaValida) {
+        return res.status(400).json({
+          success: false,
+          message: 'Senha atual incorreta'
+        });
+      }
+
+      // Atualizar senha
+      await user.update({ senha: novaSenha });
+
+      logger.info(`Senha alterada: ${user.email}`, {
+        userId: user.id,
+        ip: req.ip
+      });
+
+      res.json({
+        success: true,
+        message: 'Senha alterada com sucesso'
+      });
+
+    } catch (error) {
+      logger.error('Erro na alteração de senha:', error);
+      next(error);
+    }
+  }
+}
+
+module.exports = new AuthController();

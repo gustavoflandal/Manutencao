@@ -1,0 +1,25 @@
+{
+  "name": "sistema-manutencao-frontend",
+  "version": "1.0.0",
+  "description": "Frontend para Sistema de Manutenção",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vite",
+    "dev:clean": "npm run kill:port && vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "serve": "vite preview --host",
+    "kill:port": "powershell -Command \"$port = netstat -ano | findstr ':3002'; if ($port) { $pid = ($port -split '\\s+')[-1]; if ($pid -match '^\\d+$') { Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue } }\""
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "vue": "^3.3.4",
+    "vue-router": "^4.2.4",
+    "pinia": "^2.1.6",
+    "@vueuse/core": "^10.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.3.4",
+    "vite": "^4.4.9"
+  }
+}
