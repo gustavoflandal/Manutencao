@@ -9,6 +9,12 @@ export default defineConfig({
     strictPort: false, // Permite usar outra porta se 3002 estiver ocupada
     open: false, // Não abre automaticamente o navegador
     cors: true,
+    // Configurações para evitar problemas de cache
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0'
+    },
     // Configurações para evitar problemas de porta bloqueada
     watch: {
       usePolling: true

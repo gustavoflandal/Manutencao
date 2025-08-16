@@ -27,14 +27,14 @@ Write-Host ""
 
 # Iniciar backend
 Write-Host "🚀 Iniciando Backend (porta 3001)..." -ForegroundColor Cyan
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd 'd:\Manutencao\backend'; npm start"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot\backend'; npm start"
 
 # Aguardar backend inicializar
 Start-Sleep -Seconds 4
 
 # Iniciar frontend
 Write-Host "🎨 Iniciando Frontend (porta 3002)..." -ForegroundColor Cyan
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd 'd:\Manutencao\frontend'; npm run dev"
+Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot\frontend'; npm run dev"
 
 # Aguardar frontend inicializar
 Start-Sleep -Seconds 6

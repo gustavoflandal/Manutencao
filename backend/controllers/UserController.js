@@ -40,7 +40,13 @@ class UserController {
       // Buscar usuários
       const { count, rows: users } = await User.findAndCountAll({
         where: whereClause,
-        attributes: ['id', 'nome', 'email', 'perfil', 'departamento', 'telefone', 'ativo', 'ultimo_login', 'created_at'],
+        attributes: ['id', 'nome', 'email', 'perfil', 'departamento', 'department_id', 'telefone', 'ativo', 'ultimo_login', 'created_at'],
+        include: [{
+          model: require('../models').Department,
+          as: 'department',
+          attributes: ['id', 'nome'],
+          required: false
+        }],
         order: [[orderBy, orderDirection.toUpperCase()]],
         limit: parseInt(limit),
         offset: offset
@@ -73,7 +79,13 @@ class UserController {
       const { id } = req.params;
       
       const user = await User.findByPk(id, {
-        attributes: ['id', 'nome', 'email', 'perfil', 'departamento', 'telefone', 'ativo', 'ultimo_login', 'created_at', 'updated_at']
+        attributes: ['id', 'nome', 'email', 'perfil', 'departamento', 'department_id', 'telefone', 'ativo', 'ultimo_login', 'created_at', 'updated_at'],
+        include: [{
+          model: require('../models').Department,
+          as: 'department',
+          attributes: ['id', 'nome'],
+          required: false
+        }]
       });
 
       if (!user) {
@@ -97,7 +109,7 @@ class UserController {
   // Criar novo usuário
   async store(req, res, next) {
     try {
-      const { nome, email, senha, perfil, departamento, telefone } = req.body;
+      const { nome, email, senha, perfil, department_id, telefone } = req.body;
 
       // Validações básicas
       if (!nome || !email || !senha) {
@@ -126,13 +138,24 @@ class UserController {
         });
       }
 
+      // Buscar nome do departamento se department_id foi fornecido
+      let departmentName = null;
+      if (department_id) {
+        const { Department } = require('../models');
+        const department = await Department.findByPk(department_id);
+        if (department) {
+          departmentName = department.nome;
+        }
+      }
+
       // Criar usuário
       const userData = {
         nome: nome.trim(),
         email: email.toLowerCase().trim(),
         senha,
         perfil: perfil || 'solicitante',
-        departamento: departamento?.trim(),
+        department_id: department_id || null,
+        departamento: departmentName,
         telefone: telefone?.trim(),
         ativo: true
       };
@@ -153,6 +176,7 @@ class UserController {
             nome: user.nome,
             email: user.email,
             perfil: user.perfil,
+            department_id: user.department_id,
             departamento: user.departamento,
             telefone: user.telefone,
             ativo: user.ativo
@@ -170,7 +194,7 @@ class UserController {
   async update(req, res, next) {
     try {
       const { id } = req.params;
-      const { nome, email, perfil, departamento, telefone, ativo } = req.body;
+      const { nome, email, perfil, department_id, telefone, ativo } = req.body;
 
       // Buscar usuário
       const user = await User.findByPk(id);
@@ -211,8 +235,21 @@ class UserController {
       const updateData = {};
       if (nome) updateData.nome = nome.trim();
       if (email) updateData.email = email.toLowerCase().trim();
-      if (departamento !== undefined) updateData.departamento = departamento?.trim();
       if (telefone !== undefined) updateData.telefone = telefone?.trim();
+      
+      // Atualizar department_id e departamento
+      if (department_id !== undefined) {
+        updateData.department_id = department_id || null;
+        
+        // Buscar nome do departamento se department_id foi fornecido
+        if (department_id) {
+          const { Department } = require('../models');
+          const department = await Department.findByPk(department_id);
+          updateData.departamento = department ? department.nome : null;
+        } else {
+          updateData.departamento = null;
+        }
+      }
       
       // Campos que só admin pode alterar
       if (req.user.perfil === 'administrador') {
@@ -237,7 +274,7 @@ class UserController {
             nome: user.nome,
             email: user.email,
             perfil: user.perfil,
-            departamento: user.departamento,
+            department_id: user.department_id,
             telefone: user.telefone,
             ativo: user.ativo
           }

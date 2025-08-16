@@ -32,6 +32,14 @@ module.exports = (sequelize) => {
     departamento: {
       type: DataTypes.STRING(100)
     },
+    department_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'departments',
+        key: 'id'
+      }
+    },
     telefone: {
       type: DataTypes.STRING(20)
     },

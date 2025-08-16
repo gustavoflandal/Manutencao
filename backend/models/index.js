@@ -57,6 +57,94 @@ if (db.User && db.Permission && db.UserPermission) {
   });
 }
 
+// Associações entre User e Department
+if (db.User && db.Department) {
+  db.User.belongsTo(db.Department, {
+    foreignKey: 'department_id',
+    as: 'department'
+  });
+
+  db.Department.hasMany(db.User, {
+    foreignKey: 'department_id',
+    as: 'users'
+  });
+}
+
+// Associações para Solicitacao
+if (db.Solicitacao && db.User && db.Department) {
+  // Solicitação pertence a um solicitante (usuário)
+  db.Solicitacao.belongsTo(db.User, {
+    foreignKey: 'solicitante_id',
+    as: 'solicitante'
+  });
+
+  // Solicitação pode ter um responsável (usuário)
+  db.Solicitacao.belongsTo(db.User, {
+    foreignKey: 'responsavel_id',
+    as: 'responsavel'
+  });
+
+  // Solicitação pode pertencer a um departamento
+  db.Solicitacao.belongsTo(db.Department, {
+    foreignKey: 'department_id',
+    as: 'department'
+  });
+
+  // Usuário pode ter muitas solicitações criadas
+  db.User.hasMany(db.Solicitacao, {
+    foreignKey: 'solicitante_id',
+    as: 'solicitacoesCriadas'
+  });
+
+  // Usuário pode ser responsável por muitas solicitações
+  db.User.hasMany(db.Solicitacao, {
+    foreignKey: 'responsavel_id',
+    as: 'solicitacoesResponsavel'
+  });
+
+  // Departamento pode ter muitas solicitações
+  db.Department.hasMany(db.Solicitacao, {
+    foreignKey: 'department_id',
+    as: 'solicitacoes'
+  });
+}
+
+// Associações para Category e SubCategory
+if (db.Category && db.SubCategory && db.Solicitacao) {
+  // Category -> SubCategory
+  db.Category.hasMany(db.SubCategory, {
+    foreignKey: 'category_id',
+    as: 'subcategorias'
+  });
+
+  db.SubCategory.belongsTo(db.Category, {
+    foreignKey: 'category_id',
+    as: 'categoria'
+  });
+
+    // Category -> Solicitacao
+  db.Category.hasMany(db.Solicitacao, {
+    foreignKey: 'category_id',
+    as: 'solicitacoes'
+  });
+
+  db.Solicitacao.belongsTo(db.Category, {
+    foreignKey: 'category_id',
+    as: 'categoriaObj'  // Mudando o alias para evitar conflito
+  });
+
+  // SubCategory -> Solicitacao
+  db.SubCategory.hasMany(db.Solicitacao, {
+    foreignKey: 'subcategory_id',
+    as: 'solicitacoes'
+  });
+
+  db.Solicitacao.belongsTo(db.SubCategory, {
+    foreignKey: 'subcategory_id',
+    as: 'subcategoriaObj'  // Mudando o alias para evitar conflito
+  });
+}
+
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
 

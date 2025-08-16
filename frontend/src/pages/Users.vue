@@ -2,6 +2,7 @@
   <div class="users-page">
     <header class="page-header">
       <h1>Gerenciamento de Usuários</h1>
+      
       <button 
         v-if="canCreateUsers" 
         class="btn btn-primary" 
@@ -190,7 +191,22 @@ const deactivateUser = async (user) => {
   }
 }
 
+const verificarToken = async () => {
+  try {
+    await authStore.verifyToken()
+  } catch (error) {
+    console.error('Erro ao verificar token:', error)
+  }
+}
+
 onMounted(() => {
+  // Verificar se o usuário está autenticado
+  if (!authStore.user && authStore.token) {
+    authStore.verifyToken().catch(error => {
+      console.error('Erro ao verificar token:', error)
+    })
+  }
+  
   loadUsers()
 })
 </script>

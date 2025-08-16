@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "serve": "vite preview --host",
-    "kill:port": "powershell -Command \"$port = netstat -ano | findstr ':3002'; if ($port) { $pid = ($port -split '\\s+')[-1]; if ($pid -match '^\\d+$') { Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue } }\""
+    "kill:port": "powershell -Command \"$port = netstat -ano | findstr ':3002'; if ($port) { $processId = ($port -split '\\s+')[-1]; if ($processId -match '^\\d+$') { Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue } }\""
   },
   "dependencies": {
     "axios": "^1.4.0",

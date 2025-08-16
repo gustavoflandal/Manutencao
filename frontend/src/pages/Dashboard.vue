@@ -10,7 +10,9 @@
         <div class="card">
           <h3>Solicitações</h3>
           <div class="card-stats">
-            <span class="stats-number">0</span>
+            <span class="stats-number" :class="{ 'loading': loading }">
+              {{ loading ? '...' : stats.totalRequests }}
+            </span>
             <span class="stats-label">Total</span>
           </div>
         </div>
@@ -18,7 +20,9 @@
         <div class="card">
           <h3>Ordens de Serviço</h3>
           <div class="card-stats">
-            <span class="stats-number">0</span>
+            <span class="stats-number" :class="{ 'loading': loading }">
+              {{ loading ? '...' : stats.openWorkOrders }}
+            </span>
             <span class="stats-label">Abertas</span>
           </div>
         </div>
@@ -26,8 +30,20 @@
         <div class="card" v-if="canManageUsers">
           <h3>Usuários</h3>
           <div class="card-stats">
-            <span class="stats-number">1</span>
+            <span class="stats-number" :class="{ 'loading': loading }">
+              {{ loading ? '...' : stats.activeUsers }}
+            </span>
             <span class="stats-label">Ativos</span>
+          </div>
+        </div>
+        
+        <div class="card">
+          <h3>Departamentos</h3>
+          <div class="card-stats">
+            <span class="stats-number" :class="{ 'loading': loading }">
+              {{ loading ? '...' : stats.departments }}
+            </span>
+            <span class="stats-label">Cadastrados</span>
           </div>
         </div>
       </div>
@@ -47,6 +63,13 @@
             Gerenciar Usuários
           </button>
           
+          <button 
+            class="btn btn-secondary" 
+            @click="$router.push('/departments')"
+          >
+            Gerenciar Departamentos
+          </button>
+          
           <button class="btn btn-outline" @click="$router.push('/profile')">
             Meu Perfil
           </button>
@@ -57,10 +80,20 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import api from '@/services/api'
 
 const authStore = useAuthStore()
+
+const stats = ref({
+  totalRequests: 0,
+  openWorkOrders: 0,
+  activeUsers: 0,
+  departments: 0
+})
+
+const loading = ref(false)
 
 const canManageUsers = computed(() => {
   const roleLevel = {
@@ -71,6 +104,72 @@ const canManageUsers = computed(() => {
   }
   
   return roleLevel[authStore.user?.perfil] >= 3
+})
+
+const loadStats = async () => {
+  try {
+    loading.value = true
+    
+    // Carregar estatísticas em paralelo
+    const promises = []
+    
+    // Solicitações (todos podem ver)
+    promises.push(
+      api.get('/solicitacoes?limit=1')
+        .then(response => {
+          stats.value.totalRequests = response.data.data?.pagination?.totalItems || 0
+        })
+        .catch(() => {
+          stats.value.totalRequests = 0
+        })
+    )
+    
+    // Ordens de serviço (todos podem ver)
+    promises.push(
+      api.get('/ordens-servico?limit=1')
+        .then(response => {
+          stats.value.openWorkOrders = response.data.data?.pagination?.totalItems || 0
+        })
+        .catch(() => {
+          stats.value.openWorkOrders = 0
+        })
+    )
+    
+    // Usuários ativos (apenas supervisores e admins)
+    if (canManageUsers.value) {
+      promises.push(
+        api.get('/users?ativo=true&limit=1')
+          .then(response => {
+            stats.value.activeUsers = response.data.data?.pagination?.totalItems || 0
+          })
+          .catch(() => {
+            stats.value.activeUsers = 0
+          })
+      )
+    }
+    
+    // Departamentos (todos podem ver via endpoint público)
+    promises.push(
+      api.get('/public/departments/active')
+        .then(response => {
+          stats.value.departments = response.data.data?.departments?.length || 0
+        })
+        .catch(() => {
+          stats.value.departments = 0
+        })
+    )
+    
+    await Promise.all(promises)
+    
+  } catch (error) {
+    console.error('Erro ao carregar estatísticas:', error)
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  loadStats()
 })
 </script>
 
@@ -127,6 +226,21 @@ const canManageUsers = computed(() => {
   font-weight: 700;
   color: var(--secondary-color);
   line-height: 1;
+  transition: opacity 0.3s ease;
+}
+
+.stats-number.loading {
+  opacity: 0.5;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.8;
+  }
 }
 
 .stats-label {

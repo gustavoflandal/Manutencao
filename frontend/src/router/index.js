@@ -8,6 +8,13 @@ import Users from '@/pages/Users.vue'
 import UserForm from '@/pages/UserForm.vue'
 import Permissions from '@/pages/Permissions.vue'
 import Profile from '@/pages/Profile.vue'
+import Departments from '@/pages/Departments.vue'
+import DepartmentForm from '@/pages/DepartmentForm.vue'
+import Solicitacoes from '@/pages/Solicitacoes.vue'
+import SolicitacaoForm from '@/pages/SolicitacaoForm.vue'
+import SolicitacaoDetail from '@/pages/SolicitacaoDetail.vue'
+import Categories from '@/pages/Categories.vue'
+import SubCategories from '@/pages/SubCategories.vue'
 
 const routes = [
   {
@@ -54,6 +61,60 @@ const routes = [
     meta: { requiresAuth: true, requiresRole: 'supervisor' }
   },
   {
+    path: '/departments',
+    name: 'Departments',
+    component: Departments,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/departments/create',
+    name: 'DepartmentCreate',
+    component: DepartmentForm,
+    meta: { requiresAuth: true, requiresRole: 'supervisor' }
+  },
+  {
+    path: '/departments/:id/edit',
+    name: 'DepartmentEdit',
+    component: DepartmentForm,
+    meta: { requiresAuth: true, requiresRole: 'supervisor' }
+  },
+  {
+    path: '/solicitacoes',
+    name: 'Solicitacoes',
+    component: Solicitacoes,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/solicitacoes/create',
+    name: 'SolicitacaoCreate',
+    component: SolicitacaoForm,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/solicitacoes/:id',
+    name: 'SolicitacaoDetail',
+    component: SolicitacaoDetail,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/solicitacoes/:id/edit',
+    name: 'SolicitacaoEdit',
+    component: SolicitacaoForm,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/categories',
+    name: 'Categories',
+    component: Categories,
+    meta: { requiresAuth: true, requiresRole: 'administrador' }
+  },
+  {
+    path: '/subcategories',
+    name: 'SubCategories',
+    component: SubCategories,
+    meta: { requiresAuth: true, requiresRole: 'administrador' }
+  },
+  {
     path: '/profile',
     name: 'Profile',
     component: Profile,
@@ -78,13 +139,26 @@ const ROLE_HIERARCHY = {
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   
-  // SEMPRE forçar logout na primeira navegação (quando from.name é undefined)
-  // Isso garante que o sistema sempre abra na tela de login
-  if (from.name === undefined) {
-    authStore.logout()
-    if (to.path !== '/login') {
-      return next('/login')
+  // Se for a rota raiz, redirecionar baseado no estado de autenticação
+  if (to.path === '/') {
+    // Se tem token, tentar verificar autenticação
+    if (authStore.token && !authStore.user) {
+      try {
+        await authStore.verifyToken()
+        return next('/dashboard')
+      } catch (error) {
+        authStore.logout()
+        return next('/login')
+      }
     }
+    
+    // Se já está autenticado, ir para dashboard
+    if (authStore.isAuthenticated) {
+      return next('/dashboard')
+    }
+    
+    // Senão, ir para login
+    return next('/login')
   }
   
   // Verificar se o usuário está autenticado
@@ -94,11 +168,6 @@ router.beforeEach(async (to, from, next) => {
     } catch (error) {
       authStore.logout()
     }
-  }
-
-  // Se for a rota raiz, sempre redirecionar para login
-  if (to.path === '/') {
-    return next('/login')
   }
 
   // Rota requer autenticação

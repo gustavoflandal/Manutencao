@@ -10,7 +10,9 @@
       
       <div class="navbar-menu">
         <router-link to="/dashboard" class="nav-link">Dashboard</router-link>
+        <router-link to="/solicitacoes" class="nav-link">Solicitações</router-link>
         <router-link v-if="authStore.hasRole('supervisor')" to="/users" class="nav-link">Usuários</router-link>
+        <router-link to="/departments" class="nav-link">Departamentos</router-link>
         <router-link v-if="authStore.hasRole('supervisor')" to="/permissions" class="nav-link">Permissões</router-link>
         <router-link to="/profile" class="nav-link">Perfil</router-link>
         <button @click="handleLogout" class="nav-button">Sair</button>
@@ -79,6 +81,17 @@ const handleLogout = () => {
   min-height: 100vh;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   background: #f8f9fa;
+}
+
+/* Variáveis CSS locais para compatibilidade */
+:root {
+  --primary-color: #2c3e50;
+  --secondary-color: #3498db;
+  --primary-hover: #34495e;
+  --secondary-hover: #2980b9;
+  --border-color: #e9ecef;
+  --text-secondary: #6c757d;
+  --shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .navbar {

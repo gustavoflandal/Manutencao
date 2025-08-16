@@ -10,7 +10,7 @@ module.exports = (sequelize) => {
     numero: {
       type: DataTypes.STRING(20),
       unique: true,
-      allowNull: false
+      allowNull: true  // Permitir null temporariamente para o hook funcionar
     },
     titulo: {
       type: DataTypes.STRING(200),
@@ -22,10 +22,26 @@ module.exports = (sequelize) => {
     },
     categoria: {
       type: DataTypes.ENUM('predial', 'industrial', 'ti', 'infraestrutura'),
-      allowNull: false
+      allowNull: true  // Manter temporariamente para compatibilidade
     },
     subcategoria: {
       type: DataTypes.STRING(100)
+    },
+    category_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'categories',
+        key: 'id'
+      }
+    },
+    subcategory_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'subcategories',
+        key: 'id'
+      }
     },
     prioridade: {
       type: DataTypes.ENUM('baixa', 'normal', 'alta', 'critica'),
@@ -47,14 +63,52 @@ module.exports = (sequelize) => {
     },
     data_fechamento: {
       type: DataTypes.DATE
+    },
+    solicitante_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'users',
+        key: 'id'
+      }
+    },
+    responsavel_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id'
+      }
+    },
+    department_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'departments',
+        key: 'id'
+      }
     }
   }, {
     tableName: 'solicitacoes',
     hooks: {
-      beforeCreate: async (solicitacao) => {
-        // Gerar número sequencial
-        const count = await Solicitacao.count();
-        solicitacao.numero = `SOL${String(count + 1).padStart(6, '0')}`;
+      beforeCreate: async (solicitacao, options) => {
+        try {
+          // Gerar número sequencial único
+          const count = await sequelize.query(
+            'SELECT COUNT(*) as total FROM solicitacoes', 
+            { 
+              type: sequelize.QueryTypes.SELECT,
+              transaction: options.transaction 
+            }
+          );
+          const nextNumber = (count[0]?.total || 0) + 1;
+          solicitacao.numero = `SOL${String(nextNumber).padStart(6, '0')}`;
+        } catch (error) {
+          console.error('Erro ao gerar número da solicitação:', error);
+          // Fallback: usar timestamp
+          const timestamp = Date.now().toString().slice(-6);
+          solicitacao.numero = `SOL${timestamp}`;
+        }
       }
     }
   });

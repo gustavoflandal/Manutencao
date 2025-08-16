@@ -1,44 +1,20 @@
 const express = require('express');
 const router = express.Router();
+const SolicitacaoController = require('../controllers/SolicitacaoController');
+const { authenticate } = require('../middleware/auth');
 
-// Placeholder para rotas de solicitações
-router.get('/', (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'Lista de solicitações - implementação pendente',
-    data: []
-  });
-});
+// Aplicar autenticação em todas as rotas
+router.use(authenticate);
 
-router.get('/:id', (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'Solicitação específica - implementação pendente',
-    data: { id: req.params.id }
-  });
-});
+// Rotas principais
+router.get('/', SolicitacaoController.index);
+router.get('/stats', SolicitacaoController.stats);
+router.get('/:id', SolicitacaoController.show);
+router.post('/', SolicitacaoController.store);
+router.put('/:id', SolicitacaoController.update);
 
-router.post('/', (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'Solicitação criada - implementação pendente',
-    data: { id: 1, ...req.body }
-  });
-});
-
-router.put('/:id', (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'Solicitação atualizada - implementação pendente',
-    data: { id: req.params.id, ...req.body }
-  });
-});
-
-router.delete('/:id', (req, res) => {
-  res.json({ 
-    success: true, 
-    message: 'Solicitação excluída - implementação pendente'
-  });
-});
+// Rotas específicas
+router.patch('/:id/cancel', SolicitacaoController.cancel);
+router.patch('/:id/assign', SolicitacaoController.assignResponsible);
 
 module.exports = router;

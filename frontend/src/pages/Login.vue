@@ -151,18 +151,24 @@ export default {
       error.value = ''
       
       try {
+        console.log('🔐 Tentando fazer login...')
         const result = await authStore.login({
           email: form.email,
           senha: form.senha
         })
         
+        console.log('🔐 Resultado do login:', result)
+        console.log('🔐 Usuário após login:', authStore.user)
+        
         if (result.success) {
           // Login bem-sucedido, redirecionar
+          console.log('🔐 Login bem-sucedido, redirecionando...')
           router.push('/dashboard')
         } else {
           error.value = result.message || 'Erro no login'
         }
       } catch (err) {
+        console.error('🔐 Erro no login:', err)
         error.value = 'Erro inesperado. Tente novamente.'
       } finally {
         loading.value = false

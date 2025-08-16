@@ -77,13 +77,20 @@
 
         <div class="form-group">
           <label for="departamento">Departamento</label>
-          <input
-            id="departamento"
-            v-model="form.departamento"
-            type="text"
-            class="form-input"
-            placeholder="Departamento do usuário"
-          />
+          <select 
+            id="departamento" 
+            v-model="form.department_id" 
+            class="form-select"
+          >
+            <option value="">Selecione um departamento</option>
+            <option 
+              v-for="dept in departments" 
+              :key="dept.id" 
+              :value="dept.id"
+            >
+              {{ dept.nome }}
+            </option>
+          </select>
         </div>
 
         <div class="form-group">
@@ -139,7 +146,7 @@ const form = ref({
   email: '',
   senha: '',
   perfil: '',
-  departamento: '',
+  department_id: '',
   telefone: '',
   ativo: true
 })
@@ -147,6 +154,7 @@ const form = ref({
 const loading = ref(false)
 const emailError = ref('')
 const passwordError = ref('')
+const departments = ref([])
 
 const isEdit = computed(() => !!route.params.id)
 
@@ -183,6 +191,19 @@ const canChangeStatus = computed(() => {
   return authStore.user?.perfil === 'administrador'
 })
 
+const loadDepartments = async () => {
+  try {
+    console.log('Carregando departamentos...')
+    const response = await api.get('/public/departments/active')
+    console.log('Resposta dos departamentos:', response.data)
+    departments.value = response.data.data.departments
+    console.log('Departamentos carregados:', departments.value)
+  } catch (error) {
+    console.error('Erro ao carregar departamentos:', error)
+    useToast().error('Erro ao carregar departamentos')
+  }
+}
+
 const loadUser = async () => {
   if (!isEdit.value) return
 
@@ -196,7 +217,7 @@ const loadUser = async () => {
         email: user.email,
         senha: '', // Não carregar senha existente
         perfil: user.perfil,
-        departamento: user.departamento || '',
+        department_id: user.department_id || '',
         telefone: user.telefone || '',
         ativo: user.ativo
       }
@@ -230,7 +251,7 @@ const submitForm = async () => {
       nome: form.value.nome.trim(),
       email: form.value.email.trim().toLowerCase(),
       perfil: form.value.perfil,
-      departamento: form.value.departamento?.trim(),
+      department_id: form.value.department_id || null,
       telefone: form.value.telefone?.trim()
     }
 
@@ -304,8 +325,9 @@ const validatePassword = () => {
   }
 }
 
-onMounted(() => {
-  loadUser()
+onMounted(async () => {
+  await loadDepartments()
+  await loadUser()
 })
 </script>
 
