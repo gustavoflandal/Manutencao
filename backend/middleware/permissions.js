@@ -8,6 +8,52 @@ const PERFIL_HIERARCHY = {
   'administrador': 4
 };
 
+// Middleware para verificar permissões específicas
+const checkPermission = (permissionName) => {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Usuário não autenticado'
+        });
+      }
+
+      // Administradores têm acesso a tudo
+      if (req.user.perfil === 'administrador') {
+        return next();
+      }
+
+      // Para outras permissões, verificar se o usuário tem a permissão específica
+      // Por enquanto, vamos permitir supervisores e técnicos terem acesso básico
+      const allowedRoles = ['supervisor', 'tecnico'];
+      
+      if (!allowedRoles.includes(req.user.perfil)) {
+        logger.warn('Acesso negado por falta de permissão:', {
+          userId: req.user.id,
+          userRole: req.user.perfil,
+          requiredPermission: permissionName,
+          path: req.path,
+          method: req.method
+        });
+
+        return res.status(403).json({
+          success: false,
+          message: 'Sem permissão para acessar este recurso'
+        });
+      }
+
+      next();
+    } catch (error) {
+      logger.error('Erro no middleware de permissões específicas:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Erro interno do servidor'
+      });
+    }
+  };
+};
+
 // Middleware para verificar se o usuário tem o perfil mínimo necessário
 const requireRole = (minRole) => {
   return (req, res, next) => {
@@ -19,13 +65,20 @@ const requireRole = (minRole) => {
         });
       }
 
+      // Se minRole é um array, usar requireAnyRole
+      if (Array.isArray(minRole)) {
+        return requireAnyRole(minRole)(req, res, next);
+      }
+
       const userRoleLevel = PERFIL_HIERARCHY[req.user.perfil];
       const requiredRoleLevel = PERFIL_HIERARCHY[minRole];
 
       if (!userRoleLevel || !requiredRoleLevel) {
         logger.error('Perfil inválido detectado:', {
           userRole: req.user.perfil,
-          requiredRole: minRole
+          userRoleLevel: userRoleLevel,
+          requiredRole: minRole,
+          requiredRoleLevel: requiredRoleLevel
         });
         
         return res.status(500).json({
@@ -107,6 +160,12 @@ const requireAnyRole = (roles) => {
           message: 'Usuário não autenticado'
         });
       }
+
+      console.log('Debug requireAnyRole:', {
+        userRole: req.user.perfil,
+        allowedRoles: roles,
+        includes: roles.includes(req.user.perfil)
+      });
 
       if (!roles.includes(req.user.perfil)) {
         logger.warn('Acesso negado por perfil não autorizado:', {
@@ -195,6 +254,7 @@ const getRoleLevel = (role) => {
 };
 
 module.exports = {
+  checkPermission,
   requireRole,
   requireExactRole,
   requireAnyRole,

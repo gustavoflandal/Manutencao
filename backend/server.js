@@ -51,8 +51,16 @@ async function startServer() {
       await sequelize.sync({ alter: false });
     }
     
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, '0.0.0.0', () => {
       logger.info(`Servidor rodando na porta ${PORT}`);
+      console.log(`🚀 Servidor backend rodando em http://localhost:${PORT}`);
+      console.log(`📍 API disponível em http://localhost:${PORT}/api`);
+      console.log(`📋 Servidor ouvindo em todas as interfaces na porta ${PORT}`);
+    });
+    
+    server.on('error', (err) => {
+      console.error('❌ Erro no servidor:', err);
+      logger.error('Erro no servidor:', err);
     });
   } catch (error) {
     logger.error('Erro ao inicializar servidor:', error);

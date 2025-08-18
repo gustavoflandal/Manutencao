@@ -11,8 +11,13 @@
       <div class="navbar-menu">
         <router-link to="/dashboard" class="nav-link">Dashboard</router-link>
         <router-link to="/solicitacoes" class="nav-link">Solicitações</router-link>
+        <router-link to="/ativos" class="nav-link">Ativos</router-link>
+        <router-link v-if="authStore.hasRole('tecnico')" to="/setores" class="nav-link">Setores</router-link>
+        <router-link v-if="authStore.hasRole('tecnico')" to="/preventiva" class="nav-link">Preventiva</router-link>
+        <router-link v-if="authStore.hasRole('tecnico')" to="/estoque" class="nav-link">Estoque</router-link>
         <router-link v-if="authStore.hasRole('supervisor')" to="/users" class="nav-link">Usuários</router-link>
         <router-link to="/departments" class="nav-link">Departamentos</router-link>
+        <router-link v-if="authStore.hasRole('administrador')" to="/categories" class="nav-link">Categorias</router-link>
         <router-link v-if="authStore.hasRole('supervisor')" to="/permissions" class="nav-link">Permissões</router-link>
         <router-link to="/profile" class="nav-link">Perfil</router-link>
         <button @click="handleLogout" class="nav-button">Sair</button>

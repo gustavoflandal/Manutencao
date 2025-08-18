@@ -15,6 +15,10 @@ import SolicitacaoForm from '@/pages/SolicitacaoForm.vue'
 import SolicitacaoDetail from '@/pages/SolicitacaoDetail.vue'
 import Categories from '@/pages/Categories.vue'
 import SubCategories from '@/pages/SubCategories.vue'
+import Ativos from '@/pages/Ativos.vue'
+import Setores from '@/pages/Setores.vue'
+import Preventiva from '@/pages/Preventiva.vue'
+import Estoque from '@/pages/Estoque.vue'
 
 const routes = [
   {
@@ -113,6 +117,30 @@ const routes = [
     name: 'SubCategories',
     component: SubCategories,
     meta: { requiresAuth: true, requiresRole: 'administrador' }
+  },
+  {
+    path: '/ativos',
+    name: 'Ativos',
+    component: Ativos,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/setores',
+    name: 'Setores',
+    component: Setores,
+    meta: { requiresAuth: true, requiresRole: 'tecnico' }
+  },
+  {
+    path: '/preventiva',
+    name: 'Preventiva',
+    component: Preventiva,
+    meta: { requiresAuth: true, requiresRole: 'tecnico' }
+  },
+  {
+    path: '/estoque',
+    name: 'Estoque',
+    component: Estoque,
+    meta: { requiresAuth: true, requiresRole: 'tecnico' }
   },
   {
     path: '/profile',
