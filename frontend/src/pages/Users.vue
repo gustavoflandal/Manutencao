@@ -3,13 +3,15 @@
     <header class="page-header">
       <h1>Gerenciamento de Usuários</h1>
       
-      <button 
-        v-if="canCreateUsers" 
-        class="btn btn-primary" 
-        @click="$router.push('/users/create')"
-      >
-        Novo Usuário
-      </button>
+            <div class="header-actions">
+        <button 
+        @click="showCreateForm = true"
+        class="btn btn-create" 
+        >
+          <i class="fas fa-user-plus"></i>
+          Novo Usuário
+        </button>
+      </div>
     </header>
 
     <div class="users-content">
@@ -60,24 +62,27 @@
               <td>
                 <div class="action-buttons">
                   <button 
-                    class="btn btn-sm btn-secondary" 
+                    class="btn btn-edit btn-sm" 
                     @click="editUser(user)"
+                    title="Editar usuário"
                   >
-                    Editar
+                    <i class="fas fa-edit"></i>
                   </button>
                   <button 
                     v-if="canManagePermissions" 
-                    class="btn btn-sm btn-info" 
+                    class="btn btn-view btn-sm" 
                     @click="managePermissions(user)"
+                    title="Gerenciar permissões"
                   >
-                    Permissões
+                    <i class="fas fa-key"></i>
                   </button>
                   <button 
                     v-if="canDeactivateUser(user)" 
-                    class="btn btn-sm btn-danger" 
+                    class="btn btn-delete btn-sm" 
                     @click="deactivateUser(user)"
+                    title="Desativar usuário"
                   >
-                    Desativar
+                    <i class="fas fa-ban"></i>
                   </button>
                 </div>
               </td>

@@ -157,7 +157,7 @@ export default {
     EstoqueRelatorios
   },
   setup() {
-    const { showToast } = useToast()
+    const { toast } = useToast()
     
     const activeTab = ref('itens')
     const showAlertas = ref(false)
@@ -223,7 +223,7 @@ export default {
         
       } catch (error) {
         console.error('Erro ao carregar resumo:', error)
-        showToast('Erro ao carregar resumo do estoque', 'error')
+        toast.error('Erro ao carregar resumo do estoque')
       } finally {
         loading.value = false
       }

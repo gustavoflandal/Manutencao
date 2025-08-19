@@ -12,11 +12,12 @@
     "kill:port": "powershell -Command \"$port = netstat -ano | findstr ':3002'; if ($port) { $processId = ($port -split '\\s+')[-1]; if ($processId -match '^\\d+$') { Stop-Process -Id $processId -Force -ErrorAction SilentlyContinue } }\""
   },
   "dependencies": {
+    "@vueuse/core": "^10.3.0",
     "axios": "^1.4.0",
-    "vue": "^3.3.4",
-    "vue-router": "^4.2.4",
+    "lucide-vue-next": "^0.540.0",
     "pinia": "^2.1.6",
-    "@vueuse/core": "^10.3.0"
+    "vue": "^3.3.4",
+    "vue-router": "^4.2.4"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.3.4",

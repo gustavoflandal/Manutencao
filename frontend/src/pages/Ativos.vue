@@ -5,9 +5,10 @@
       
       <button 
         v-if="podeGerenciarAtivos" 
-        class="btn btn-primary" 
+        class="btn btn-create" 
         @click="abrirModalCadastro()"
       >
+        <i class="fas fa-plus"></i>
         Novo Ativo
       </button>
     </header>
@@ -129,23 +130,26 @@
               <td v-if="podeGerenciarAtivos">
                 <div class="action-buttons">
                   <button 
-                    class="btn btn-sm btn-secondary" 
+                    class="btn btn-edit btn-sm" 
                     @click="editarAtivo(ativo)"
+                    title="Editar ativo"
                   >
-                    Editar
+                    <i class="fas fa-edit"></i>
                   </button>
                   <button 
-                    class="btn btn-sm btn-info" 
+                    class="btn btn-view btn-sm" 
                     @click="visualizarAtivo(ativo)"
+                    title="Visualizar ativo"
                   >
-                    Ver
+                    <i class="fas fa-eye"></i>
                   </button>
                   <button 
                     v-if="podeExcluirAtivos"
-                    class="btn btn-sm btn-danger" 
+                    class="btn btn-delete btn-sm" 
                     @click="excluirAtivo(ativo)"
+                    title="Excluir ativo"
                   >
-                    Excluir
+                    <i class="fas fa-trash"></i>
                   </button>
                 </div>
               </td>

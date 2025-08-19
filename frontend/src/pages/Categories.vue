@@ -2,7 +2,7 @@
   <div class="categories-page">
     <header class="page-header">
       <h1>Gerenciamento de Categorias</h1>
-      <button @click="showCreateForm = true" class="btn btn-primary">
+      <button @click="showCreateForm = true" class="btn btn-create">
         <i class="fas fa-plus"></i>
         Nova Categoria
       </button>
@@ -38,7 +38,16 @@
           <div class="card-content">
             <div class="category-info">
               <div class="category-icon" :style="{ backgroundColor: categoria.cor || '#6c757d' }">
-                <i :class="categoria.icone || 'fas fa-folder'" class="icon"></i>
+                <!-- Componente Lucide para ícones da galeria -->
+                <component 
+                  v-if="getIconFromGallery(categoria.icone)?.component" 
+                  :is="getIconFromGallery(categoria.icone).component" 
+                  class="icon-component" 
+                  :size="20" 
+                  color="white" 
+                />
+                <!-- FontAwesome para ícones tradicionais -->
+                <i v-else :class="categoria.icone || 'fas fa-folder'" class="icon"></i>
               </div>
               <div class="category-details">
                 <h3>{{ categoria.nome }}</h3>
@@ -54,15 +63,15 @@
               </div>
             </div>
             <div class="card-actions">
-              <button @click="editCategory(categoria)" class="btn btn-sm btn-outline" title="Editar">
+              <button @click="editCategory(categoria)" class="btn-icon btn-edit btn-sm" title="Editar">
                 <i class="fas fa-edit"></i>
               </button>
-              <button @click="viewSubcategories(categoria)" class="btn btn-sm btn-outline" title="Ver Subcategorias">
+              <button @click="viewSubcategories(categoria)" class="btn-icon btn-view btn-sm" title="Ver Subcategorias">
                 <i class="fas fa-list"></i>
               </button>
               <button 
                 @click="deleteCategory(categoria)" 
-                class="btn btn-sm btn-danger"
+                class="btn-icon btn-delete btn-sm"
                 title="Excluir"
                 :disabled="categoria.subcategorias?.length > 0"
               >
@@ -78,7 +87,7 @@
         <i class="fas fa-folder-open"></i>
         <h3>Nenhuma categoria encontrada</h3>
         <p>Crie a primeira categoria para começar a organizar as solicitações.</p>
-        <button @click="showCreateForm = true" class="btn btn-primary">
+        <button @click="showCreateForm = true" class="btn btn-create">
           <i class="fas fa-plus"></i>
           Nova Categoria
         </button>
@@ -117,77 +126,165 @@
     <div v-if="showCreateForm || showEditForm" class="modal-overlay" @click="closeModal">
       <div class="modal-content" @click.stop>
         <div class="modal-header">
-          <h2>{{ showEditForm ? 'Editar Categoria' : 'Nova Categoria' }}</h2>
-          <button @click="closeModal" class="close-btn">&times;</button>
+          <h4>{{ showEditForm ? 'Editar' : 'Nova' }} Categoria</h4>
+          <button class="btn-close" @click="closeModal">
+            <i class="fas fa-times"></i>
+          </button>
         </div>
-        <form @submit.prevent="saveCategory" class="modal-body">
+
+        <form @submit.prevent="saveCategory">
           <div class="form-group">
-            <label>Nome *</label>
-            <input 
-              v-model="form.nome" 
-              type="text" 
-              class="form-control" 
+            <label for="nome">Nome *</label>
+            <input
+              type="text"
+              id="nome"
+              v-model="form.nome"
+              class="form-control"
               :class="{ 'is-invalid': errors.nome }"
               required
-            >
+              maxlength="100"
+              placeholder="Nome da categoria"
+              @blur="validateNome"
+              @input="errors.nome && validateNome()"
+            />
             <div v-if="errors.nome" class="invalid-feedback">{{ errors.nome }}</div>
           </div>
 
           <div class="form-group">
-            <label>Descrição</label>
-            <textarea 
-              v-model="form.descricao" 
-              class="form-control" 
-              rows="3"
+            <label for="descricao">Descrição</label>
+            <textarea
+              id="descricao"
+              v-model="form.descricao"
+              class="form-control"
               :class="{ 'is-invalid': errors.descricao }"
+              rows="3"
+              maxlength="500"
+              placeholder="Descrição da categoria (opcional)"
+              @blur="validateDescricao"
+              @input="errors.descricao && validateDescricao()"
             ></textarea>
             <div v-if="errors.descricao" class="invalid-feedback">{{ errors.descricao }}</div>
           </div>
 
           <div class="form-row">
-            <div class="form-group col-md-6">
-              <label>Cor</label>
-              <input 
-                v-model="form.cor" 
-                type="color" 
-                class="form-control color-picker"
-                :class="{ 'is-invalid': errors.cor }"
-              >
+            <div class="form-group col-6">
+              <label for="cor">Cor</label>
+              <div class="color-input-wrapper">
+                <input
+                  type="color"
+                  id="cor"
+                  v-model="form.cor"
+                  class="form-control color-picker"
+                  :class="{ 'is-invalid': errors.cor }"
+                  @change="validateCor"
+                />
+                <span class="color-preview" :style="{ backgroundColor: form.cor }"></span>
+              </div>
               <div v-if="errors.cor" class="invalid-feedback">{{ errors.cor }}</div>
             </div>
 
-            <div class="form-group col-md-6">
-              <label>Ícone (FontAwesome)</label>
-              <input 
-                v-model="form.icone" 
-                type="text" 
-                class="form-control" 
-                placeholder="fas fa-tools"
-                :class="{ 'is-invalid': errors.icone }"
-              >
-              <small class="form-text text-muted">Ex: fas fa-tools, fas fa-computer, etc.</small>
+            <div class="form-group col-6">
+              <label for="icone">Ícone</label>
+              <div class="icon-selection-tabs">
+                <!-- Abas de seleção -->
+                <div class="icon-tabs">
+                  <button
+                    type="button"
+                    class="tab-btn"
+                    :class="{ 'active': iconSelectionMode === 'picker' }"
+                    @click="iconSelectionMode = 'picker'"
+                  >
+                    <i class="fas fa-th"></i>
+                    Galeria
+                  </button>
+                  <button
+                    type="button"
+                    class="tab-btn"
+                    :class="{ 'active': iconSelectionMode === 'fontawesome' }"
+                    @click="iconSelectionMode = 'fontawesome'"
+                  >
+                    <i class="fab fa-font-awesome"></i>
+                    FontAwesome
+                  </button>
+                </div>
+
+                <!-- Seletor de ícones -->
+                <div v-if="iconSelectionMode === 'picker'" class="icon-picker-container">
+                  <IconPicker
+                    v-model="selectedIconName"
+                    :icon-color="form.cor || '#6c757d'"
+                    @update:modelValue="updateIconFromPicker"
+                  />
+                </div>
+
+                <!-- Input FontAwesome -->
+                <div v-else class="fontawesome-input">
+                  <div class="icon-input-wrapper">
+                    <input
+                      type="text"
+                      id="icone"
+                      v-model="form.icone"
+                      class="form-control"
+                      :class="{ 'is-invalid': errors.icone }"
+                      placeholder="fas fa-tools"
+                      @blur="validateIcone"
+                      @input="errors.icone && validateIcone()"
+                    />
+                    <span class="icon-preview" :style="{ color: form.cor }">
+                      <i :class="form.icone || 'fas fa-folder'"></i>
+                    </span>
+                  </div>
+                  <small class="form-text">Ex: fas fa-tools, fas fa-computer, etc.</small>
+                </div>
+              </div>
               <div v-if="errors.icone" class="invalid-feedback">{{ errors.icone }}</div>
             </div>
           </div>
 
           <div class="form-group">
-            <div class="form-check">
-              <input 
-                v-model="form.ativo" 
-                type="checkbox" 
-                class="form-check-input" 
-                id="ativo"
-              >
-              <label class="form-check-label" for="ativo">
-                Categoria ativa
-              </label>
+            <label class="checkbox-label">
+              <input
+                type="checkbox"
+                v-model="form.ativo"
+              />
+              Categoria ativa
+            </label>
+          </div>
+
+          <!-- Preview da categoria -->
+          <div class="form-group">
+            <label>Preview</label>
+            <div class="category-preview">
+              <div class="preview-icon" :style="{ backgroundColor: form.cor || '#6c757d' }">
+                <!-- Componente Lucide para ícones da galeria -->
+                <component 
+                  v-if="selectedIconFromGallery?.component" 
+                  :is="selectedIconFromGallery.component" 
+                  class="preview-component" 
+                  :size="24" 
+                  color="white" 
+                />
+                <!-- FontAwesome para ícones tradicionais -->
+                <i v-else :class="form.icone || 'fas fa-folder'" class="preview-fontawesome"></i>
+              </div>
+              <div class="preview-info">
+                <h5>{{ form.nome || 'Nome da categoria' }}</h5>
+                <p>{{ form.descricao || 'Descrição da categoria aparecerá aqui' }}</p>
+                <span class="preview-status" :class="form.ativo ? 'active' : 'inactive'">
+                  {{ form.ativo ? 'Ativo' : 'Inativo' }}
+                </span>
+              </div>
             </div>
           </div>
 
-          <div class="modal-footer">
-            <button type="button" @click="closeModal" class="btn btn-secondary">Cancelar</button>
+          <div class="form-actions">
+            <button type="button" class="btn btn-outline" @click="closeModal">
+              <i class="fas fa-times"></i>
+              Cancelar
+            </button>
             <button type="submit" class="btn btn-primary" :disabled="loading">
               <i v-if="loading" class="fas fa-spinner fa-spin"></i>
+              <i v-else :class="showEditForm ? 'fas fa-save' : 'fas fa-plus'"></i>
               {{ showEditForm ? 'Atualizar' : 'Criar' }}
             </button>
           </div>
@@ -206,11 +303,14 @@ import { useRouter } from 'vue-router'
 import api from '@/services/api'
 import { useToast } from '@/composables/useToast'
 import Toast from '@/components/Toast.vue'
+import IconPicker from '@/components/IconPicker.vue'
+import { systemIcons } from '@/assets/icons'
 
 export default {
   name: 'Categories',
   components: {
-    Toast
+    Toast,
+    IconPicker
   },
   setup() {
     const router = useRouter()
@@ -222,6 +322,10 @@ export default {
     const showCreateForm = ref(false)
     const showEditForm = ref(false)
     const editingCategory = ref(null)
+
+    // Seletor de ícones
+    const iconSelectionMode = ref('picker') // 'picker' ou 'fontawesome'
+    const selectedIconName = ref('')
 
     // Filtros
     const filters = reactive({
@@ -262,6 +366,25 @@ export default {
       return pages
     })
 
+    // Ícone selecionado da galeria
+    const selectedIconFromGallery = computed(() => {
+      if (iconSelectionMode.value === 'picker' && selectedIconName.value) {
+        return systemIcons.find(icon => icon.name === selectedIconName.value)
+      }
+      return null
+    })
+
+    // Função para obter ícone da galeria
+    const getIconFromGallery = (iconName) => {
+      return systemIcons.find(icon => icon.name === iconName)
+    }
+
+    // Métodos do seletor de ícones
+    const updateIconFromPicker = (iconName) => {
+      selectedIconName.value = iconName
+      form.icone = iconName // Armazenar nome do ícone da galeria
+    }
+
     // Métodos
     const loadCategories = async () => {
       try {
@@ -276,10 +399,10 @@ export default {
         }
 
         const response = await api.get('/categories', { params })
-        categorias.value = response.data.categorias
+        categorias.value = response.data.data.categorias
         
         // Atualizar paginação
-        Object.assign(pagination, response.data.pagination)
+        Object.assign(pagination, response.data.data.pagination)
         
       } catch (error) {
         console.error('Erro ao carregar categorias:', error)
@@ -315,7 +438,61 @@ export default {
         icone: 'fas fa-folder',
         ativo: true
       })
+      // Reset do seletor de ícones
+      selectedIconName.value = ''
+      iconSelectionMode.value = 'picker'
       errors.value = {}
+    }
+
+    // Validação em tempo real
+    const validateNome = () => {
+      if (!form.nome || form.nome.trim().length < 2) {
+        errors.value.nome = 'Nome deve ter pelo menos 2 caracteres'
+        return false
+      }
+      if (form.nome.trim().length > 100) {
+        errors.value.nome = 'Nome deve ter no máximo 100 caracteres'
+        return false
+      }
+      delete errors.value.nome
+      return true
+    }
+
+    const validateDescricao = () => {
+      if (form.descricao && form.descricao.length > 500) {
+        errors.value.descricao = 'Descrição deve ter no máximo 500 caracteres'
+        return false
+      }
+      delete errors.value.descricao
+      return true
+    }
+
+    const validateCor = () => {
+      const colorRegex = /^#[0-9A-F]{6}$/i
+      if (form.cor && !colorRegex.test(form.cor)) {
+        errors.value.cor = 'Cor deve estar no formato hexadecimal #FFFFFF'
+        return false
+      }
+      delete errors.value.cor
+      return true
+    }
+
+    const validateIcone = () => {
+      if (form.icone && form.icone.length > 50) {
+        errors.value.icone = 'Nome do ícone deve ter no máximo 50 caracteres'
+        return false
+      }
+      delete errors.value.icone
+      return true
+    }
+
+    const validateForm = () => {
+      let isValid = true
+      isValid = validateNome() && isValid
+      isValid = validateDescricao() && isValid
+      isValid = validateCor() && isValid
+      isValid = validateIcone() && isValid
+      return isValid
     }
 
     const closeModal = () => {
@@ -334,13 +511,29 @@ export default {
         icone: categoria.icone || 'fas fa-folder',
         ativo: categoria.ativo
       })
+      
+      // Verificar se é um ícone da galeria
+      const iconFromGallery = getIconFromGallery(categoria.icone)
+      if (iconFromGallery) {
+        iconSelectionMode.value = 'picker'
+        selectedIconName.value = categoria.icone
+      } else {
+        iconSelectionMode.value = 'fontawesome'
+        selectedIconName.value = ''
+      }
+      
       showEditForm.value = true
     }
 
     const saveCategory = async () => {
       try {
         loading.value = true
-        errors.value = {}
+        
+        // Validar formulário antes de enviar
+        if (!validateForm()) {
+          showToast('Por favor, corrija os erros no formulário', 'error')
+          return
+        }
 
         if (showEditForm.value) {
           await api.put(`/categories/${editingCategory.value.id}`, form)
@@ -357,7 +550,7 @@ export default {
         console.error('Erro ao salvar categoria:', error)
         
         if (error.response?.data?.errors) {
-          // Mapear erros de validação
+          // Mapear erros de validação do backend
           error.response.data.errors.forEach(err => {
             errors.value[err.field] = err.message
           })
@@ -406,6 +599,13 @@ export default {
       form,
       errors,
       visiblePages,
+      // Seletor de ícones
+      iconSelectionMode,
+      selectedIconName,
+      selectedIconFromGallery,
+      getIconFromGallery,
+      updateIconFromPicker,
+      // Métodos
       loadCategories,
       debouncedSearch,
       changePage,
@@ -413,7 +613,12 @@ export default {
       editCategory,
       saveCategory,
       deleteCategory,
-      viewSubcategories
+      viewSubcategories,
+      validateNome,
+      validateDescricao,
+      validateCor,
+      validateIcone,
+      validateForm
     }
   }
 }
@@ -768,7 +973,7 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0, 0, 0, 0.5);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -782,43 +987,231 @@ export default {
   max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
 .modal-header {
-  padding: 20px;
-  border-bottom: 1px solid #eee;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 24px;
+  border-bottom: 1px solid #e1e5e9;
+  background: #f8f9fa;
+  border-radius: 12px 12px 0 0;
 }
 
-.modal-header h2 {
+.modal-header h4 {
   margin: 0;
+  color: var(--color-primary);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #6c757d;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.btn-close:hover {
+  color: #dc3545;
+  background: #f8d7da;
+}
+
+.modal-content form {
+  padding: 24px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  color: #2c3e50;
+  font-size: 14px;
+}
+
+.form-control {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e1e5e9;
+  border-radius: 8px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: var(--btn-primary);
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.form-control.is-invalid {
+  border-color: var(--btn-delete);
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
+
+.invalid-feedback {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--btn-delete);
+}
+
+.form-row {
+  display: flex;
+  gap: 16px;
+  margin: 0;
+}
+
+.form-row .form-group {
+  flex: 1;
+  margin: 0 0 20px 0;
+}
+
+.col-6 {
+  flex: 0 0 calc(50% - 8px);
+}
+
+.color-input-wrapper,
+.icon-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.color-picker {
+  padding: 4px 8px;
+  height: 44px;
+  cursor: pointer;
+}
+
+.color-preview {
+  position: absolute;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 2px solid #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  pointer-events: none;
+}
+
+.icon-preview {
+  position: absolute;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  pointer-events: none;
+}
+
+.form-text {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6c757d;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-weight: 500;
   color: #2c3e50;
 }
 
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: #999;
+.checkbox-label input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
 }
 
-.close-btn:hover {
-  color: #666;
-}
-
-.modal-body {
-  padding: 20px;
-}
-
-.modal-footer {
-  padding: 20px;
-  border-top: 1px solid #eee;
+.category-preview {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #f8f9fa;
+  border: 2px dashed #e1e5e9;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.preview-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.preview-info {
+  flex: 1;
+}
+
+.preview-info h5 {
+  margin: 0 0 4px 0;
+  color: #2c3e50;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.preview-info p {
+  margin: 0 0 8px 0;
+  color: #6c757d;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.preview-status {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.preview-status.active {
+  background-color: var(--btn-success-light);
+  color: var(--btn-success);
+}
+
+.preview-status.inactive {
+  background-color: var(--btn-secondary-light);
+  color: var(--btn-secondary);
+}
+
+.form-actions {
+  display: flex;
   justify-content: flex-end;
+  gap: 12px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid #e1e5e9;
 }
 
 .pagination-wrapper {
@@ -872,7 +1265,11 @@ export default {
   }
   
   .filters {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+  
+  .form-input {
+    min-width: unset;
   }
   
   .category-header {
@@ -883,5 +1280,125 @@ export default {
   .category-actions {
     align-self: flex-end;
   }
+  
+  .modal-content {
+    width: 95%;
+    max-width: none;
+    margin: 10px;
+  }
+  
+  .modal-header {
+    padding: 16px;
+  }
+  
+  .modal-content form {
+    padding: 16px;
+  }
+  
+  .form-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  
+  .col-6 {
+    flex: 1;
+  }
+  
+  .category-preview {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+  
+  .form-actions {
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+  
+  .form-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* === SELETOR DE ÍCONES === */
+.icon-selection-tabs {
+  width: 100%;
+}
+
+.icon-tabs {
+  display: flex;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid #e1e5e9;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 8px 12px;
+  background: white;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #6c757d;
+}
+
+.tab-btn:hover {
+  background: #f8f9fa;
+}
+
+.tab-btn.active {
+  background: var(--btn-primary);
+  color: white;
+}
+
+.tab-btn i {
+  font-size: 14px;
+}
+
+.icon-picker-container {
+  width: 100%;
+}
+
+.fontawesome-input {
+  width: 100%;
+}
+
+/* Componentes Lucide */
+.icon-component {
+  width: 20px;
+  height: 20px;
+  color: white;
+  flex-shrink: 0;
+}
+
+.preview-component {
+  width: 24px;
+  height: 24px;
+  color: white;
+  flex-shrink: 0;
+}
+
+.preview-fontawesome {
+  font-size: 20px;
+  color: white;
+}
+
+/* Grid Icons */
+.category-icon .icon-component {
+  width: 20px;
+  height: 20px;
+  color: white;
+}
+
+.category-icon .icon {
+  color: white;
+  font-size: 20px;
 }
 </style>

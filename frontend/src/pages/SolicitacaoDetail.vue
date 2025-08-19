@@ -10,12 +10,14 @@
       <div class="header-actions">
         <button 
           v-if="canEdit" 
-          class="btn btn-secondary" 
+          class="btn btn-edit" 
           @click="$router.push(`/solicitacoes/${solicitacao?.id}/edit`)"
         >
+          <i class="fas fa-edit"></i>
           Editar
         </button>
         <button class="btn btn-outline" @click="$router.push('/solicitacoes')">
+          <i class="fas fa-arrow-left"></i>
           Voltar
         </button>
       </div>
@@ -137,9 +139,10 @@
         <div class="quick-actions">
           <button 
             v-if="solicitacao.status === 'aberta'"
-            class="btn btn-info"
+            class="btn btn-primary"
             @click="updateStatus('em_analise')"
           >
+            <i class="fas fa-eye"></i>
             Colocar em Análise
           </button>
           
@@ -148,14 +151,16 @@
             class="btn btn-success"
             @click="updateStatus('aprovada')"
           >
+            <i class="fas fa-check"></i>
             Aprovar
           </button>
           
           <button 
             v-if="solicitacao.status === 'aprovada'"
-            class="btn btn-warning"
+            class="btn btn-info"
             @click="updateStatus('em_execucao')"
           >
+            <i class="fas fa-play"></i>
             Iniciar Execução
           </button>
           
@@ -164,6 +169,7 @@
             class="btn btn-success"
             @click="updateStatus('fechada')"
           >
+            <i class="fas fa-check-circle"></i>
             Finalizar
           </button>
           
@@ -172,6 +178,7 @@
             class="btn btn-danger"
             @click="showCancelModal = true"
           >
+            <i class="fas fa-ban"></i>
             Cancelar
           </button>
         </div>

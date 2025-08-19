@@ -2,6 +2,60 @@
 Write-Host "🔧 Iniciando Sistema de Manutenção..." -ForegroundColor Cyan
 Write-Host ""
 
+# Verificar se o sistema foi inicializado
+function Test-SystemInitialized {
+    $configExists = Test-Path "backend\config\database.js"
+    $modelsExist = Test-Path "backend\models\index.js"
+    $initScriptExists = Test-Path "backend\initialize-database.js"
+    
+    return $configExists -and $modelsExist -and $initScriptExists
+}
+
+# Verificar se banco foi configurado
+function Test-DatabaseConfigured {
+    try {
+        # Verificar se consegue conectar ao banco
+        $testScript = @"
+const sequelize = require('./config/database');
+sequelize.authenticate()
+  .then(() => { console.log('OK'); process.exit(0); })
+  .catch(() => { console.log('FAIL'); process.exit(1); });
+"@
+        
+        $testScript | Out-File -FilePath "backend\temp-test.js" -Encoding UTF8
+        
+        Push-Location "backend"
+        $result = node temp-test.js 2>&1
+        Pop-Location
+        
+        Remove-Item "backend\temp-test.js" -ErrorAction SilentlyContinue
+        
+        return $result -eq "OK"
+    } catch {
+        return $false
+    }
+}
+
+# Verificar inicialização
+if (-not (Test-SystemInitialized)) {
+    Write-Host "❌ Sistema não foi inicializado!" -ForegroundColor Red
+    Write-Host "   Execute primeiro: .\inicializar-sistema.ps1" -ForegroundColor Yellow
+    Write-Host ""
+    Read-Host "Pressione Enter para continuar mesmo assim ou Ctrl+C para sair"
+} elseif (-not (Test-DatabaseConfigured)) {
+    Write-Host "⚠️ Banco de dados não está configurado!" -ForegroundColor Yellow
+    Write-Host "   Recomendado executar: .\inicializar-sistema.ps1" -ForegroundColor Yellow
+    Write-Host ""
+    $response = Read-Host "Continuar mesmo assim? (s/N)"
+    if ($response -ne "s" -and $response -ne "S") {
+        exit
+    }
+} else {
+    Write-Host "✅ Sistema verificado e pronto!" -ForegroundColor Green
+}
+
+Write-Host ""
+
 # Parar processos Node.js existentes
 Write-Host "🧹 Limpando processos anteriores..." -ForegroundColor Yellow
 Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue

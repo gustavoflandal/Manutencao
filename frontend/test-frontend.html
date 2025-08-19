@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste Sistema de Manutenção</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .loading { background-color: #fff3cd; border-color: #ffeaa7; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔧 Teste do Sistema de Manutenção</h1>
+    
+    <div class="test-section">
+        <h3>🌐 Conectividade</h3>
+        <p><strong>Frontend:</strong> <span id="frontend-status">Testando...</span></p>
+        <p><strong>Backend:</strong> <span id="backend-status">Testando...</span></p>
+    </div>
+    
+    <div class="test-section">
+        <h3>🔐 Autenticação</h3>
+        <p><strong>Status:</strong> <span id="auth-status">Verificando...</span></p>
+        <button onclick="testLogin()">Testar Login (admin/123456)</button>
+        <button onclick="clearStorage()">Limpar Armazenamento</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>📊 Dados</h3>
+        <p><strong>Departamentos:</strong> <span id="departments-status">Carregando...</span></p>
+        <p><strong>Usuários:</strong> <span id="users-status">Carregando...</span></p>
+        <button onclick="testEndpoints()">Testar Endpoints</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>🧪 Logs de Teste</h3>
+        <pre id="test-logs">Iniciando testes...</pre>
+    </div>
+    
+    <div class="test-section">
+        <h3>🚀 Ações Rápidas</h3>
+        <button onclick="window.open('http://localhost:3004/', '_blank')">Abrir Frontend (3004)</button>
+        <button onclick="window.open('http://localhost:3003/', '_blank')">Abrir Frontend (3003)</button>
+        <button onclick="testApiHealth()">Testar Health API</button>
+        <button onclick="checkLocalStorage()">Verificar localStorage</button>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3001/api';
+        const FRONTEND_URL = 'http://localhost:3004';
+        
+        let logs = [];
+        
+        function addLog(message) {
+            const timestamp = new Date().toLocaleTimeString();
+            logs.push(`[${timestamp}] ${message}`);
+            document.getElementById('test-logs').textContent = logs.join('\n');
+        }
+        
+        function updateStatus(elementId, status, isSuccess) {
+            const element = document.getElementById(elementId);
+            element.textContent = status;
+            element.parentElement.className = 'test-section ' + (isSuccess ? 'success' : 'error');
+        }
+        
+        async function testFrontend() {
+            try {
+                const response = await fetch(FRONTEND_URL);
+                if (response.ok) {
+                    updateStatus('frontend-status', '✅ Online (porta 3004)', true);
+                    addLog('Frontend: Conectado com sucesso');
+                } else {
+                    updateStatus('frontend-status', '❌ Erro HTTP ' + response.status, false);
+                    addLog('Frontend: Erro HTTP ' + response.status);
+                }
+            } catch (error) {
+                updateStatus('frontend-status', '❌ Offline - ' + error.message, false);
+                addLog('Frontend: Erro - ' + error.message);
+            }
+        }
+        
+        async function testBackend() {
+            try {
+                const response = await fetch(API_BASE + '/health');
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStatus('backend-status', '✅ Online (uptime: ' + Math.round(data.uptime) + 's)', true);
+                    addLog('Backend: Conectado - uptime ' + Math.round(data.uptime) + 's');
+                } else {
+                    updateStatus('backend-status', '❌ Erro HTTP ' + response.status, false);
+                    addLog('Backend: Erro HTTP ' + response.status);
+                }
+            } catch (error) {
+                updateStatus('backend-status', '❌ Offline - ' + error.message, false);
+                addLog('Backend: Erro - ' + error.message);
+            }
+        }
+        
+        async function checkAuth() {
+            const token = localStorage.getItem('access_token');
+            if (!token) {
+                updateStatus('auth-status', '❌ Não autenticado', false);
+                addLog('Auth: Nenhum token encontrado');
+                return;
+            }
+            
+            try {
+                const response = await fetch(API_BASE + '/auth/verify', {
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStatus('auth-status', '✅ Autenticado: ' + data.data.user.nome, true);
+                    addLog('Auth: Token válido - ' + data.data.user.nome + ' (' + data.data.user.perfil + ')');
+                } else {
+                    updateStatus('auth-status', '❌ Token inválido', false);
+                    addLog('Auth: Token inválido ou expirado');
+                }
+            } catch (error) {
+                updateStatus('auth-status', '❌ Erro: ' + error.message, false);
+                addLog('Auth: Erro ao verificar token - ' + error.message);
+            }
+        }
+        
+        async function testLogin() {
+            try {
+                addLog('Login: Tentando autenticar como admin...');
+                const response = await fetch(API_BASE + '/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@sistema.com',
+                        senha: '123456'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    localStorage.setItem('access_token', data.data.accessToken);
+                    localStorage.setItem('refresh_token', data.data.refreshToken);
+                    addLog('Login: Sucesso! Token armazenado.');
+                    await checkAuth();
+                } else {
+                    addLog('Login: Falha - ' + (data.message || 'Erro desconhecido'));
+                }
+            } catch (error) {
+                addLog('Login: Erro - ' + error.message);
+            }
+        }
+        
+        async function testEndpoints() {
+            const token = localStorage.getItem('access_token');
+            const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+            
+            // Teste departamentos (público)
+            try {
+                const response = await fetch(API_BASE + '/public/departments/active');
+                if (response.ok) {
+                    const data = await response.json();
+                    updateStatus('departments-status', '✅ ' + data.data.departments.length + ' departamentos', true);
+                    addLog('Departamentos: ' + data.data.departments.length + ' encontrados');
+                } else {
+                    updateStatus('departments-status', '❌ Erro HTTP ' + response.status, false);
+                    addLog('Departamentos: Erro HTTP ' + response.status);
+                }
+            } catch (error) {
+                updateStatus('departments-status', '❌ Erro: ' + error.message, false);
+                addLog('Departamentos: Erro - ' + error.message);
+            }
+            
+            // Teste usuários (requer autenticação)
+            if (token) {
+                try {
+                    const response = await fetch(API_BASE + '/users?limit=1', { headers });
+                    if (response.ok) {
+                        const data = await response.json();
+                        const total = data.data.pagination?.totalItems || 0;
+                        updateStatus('users-status', '✅ ' + total + ' usuários', true);
+                        addLog('Usuários: ' + total + ' encontrados');
+                    } else {
+                        updateStatus('users-status', '❌ Erro HTTP ' + response.status, false);
+                        addLog('Usuários: Erro HTTP ' + response.status);
+                    }
+                } catch (error) {
+                    updateStatus('users-status', '❌ Erro: ' + error.message, false);
+                    addLog('Usuários: Erro - ' + error.message);
+                }
+            } else {
+                updateStatus('users-status', '⚠️ Requer autenticação', false);
+                addLog('Usuários: Token necessário');
+            }
+        }
+        
+        function clearStorage() {
+            localStorage.clear();
+            addLog('Storage: Dados limpos');
+            checkAuth();
+        }
+        
+        function checkLocalStorage() {
+            const token = localStorage.getItem('access_token');
+            const refresh = localStorage.getItem('refresh_token');
+            addLog('Storage: Token=' + (token ? 'SIM (' + token.substring(0, 20) + '...)' : 'NÃO'));
+            addLog('Storage: Refresh=' + (refresh ? 'SIM (' + refresh.substring(0, 20) + '...)' : 'NÃO'));
+        }
+        
+        async function testApiHealth() {
+            await testBackend();
+        }
+        
+        // Executar testes iniciais
+        window.onload = async function() {
+            addLog('Iniciando testes automáticos...');
+            await testFrontend();
+            await testBackend();
+            await checkAuth();
+            await testEndpoints();
+            addLog('Testes iniciais concluídos!');
+        };
+    </script>
+</body>
+</html>

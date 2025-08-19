@@ -2,7 +2,7 @@
   <div class="estoque-fornecedores">
     <div class="section-header">
       <h3>Fornecedores</h3>
-      <button class="btn btn-primary" @click="abrirFormulario()">
+      <button class="btn btn-create" @click="abrirFormulario()">
         <i class="fas fa-plus"></i>
         Novo Fornecedor
       </button>
@@ -53,14 +53,14 @@
             <h5>{{ fornecedor.nome }}</h5>
             <div class="fornecedor-actions">
               <button 
-                class="btn-icon" 
+                class="btn-icon btn-edit btn-sm" 
                 title="Editar"
                 @click="editarFornecedor(fornecedor)"
               >
                 <i class="fas fa-edit"></i>
               </button>
               <button 
-                class="btn-icon" 
+                class="btn-icon btn-delete btn-sm" 
                 title="Excluir"
                 @click="excluirFornecedor(fornecedor)"
               >
@@ -193,7 +193,7 @@
           </div>
 
           <div class="form-actions">
-            <button type="button" class="btn btn-secondary" @click="fecharFormulario">
+            <button type="button" class="btn btn-outline" @click="fecharFormulario">
               Cancelar
             </button>
             <button type="submit" class="btn btn-primary">

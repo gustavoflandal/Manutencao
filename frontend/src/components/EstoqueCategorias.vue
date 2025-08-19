@@ -2,7 +2,7 @@
   <div class="estoque-categorias">
     <div class="section-header">
       <h3>Categorias de Estoque</h3>
-      <button class="btn btn-primary" @click="abrirFormulario()">
+      <button class="btn btn-create" @click="abrirFormulario()">
         <i class="fas fa-plus"></i>
         Nova Categoria
       </button>
@@ -35,14 +35,14 @@
             </div>
             <div class="categoria-actions">
               <button 
-                class="btn-icon" 
+                class="btn-icon btn-edit btn-sm" 
                 title="Editar"
                 @click="editarCategoria(categoria)"
               >
                 <i class="fas fa-edit"></i>
               </button>
               <button 
-                class="btn-icon" 
+                class="btn-icon btn-delete btn-sm" 
                 title="Excluir"
                 @click="excluirCategoria(categoria)"
               >
@@ -112,7 +112,7 @@
           </div>
 
           <div class="form-actions">
-            <button type="button" class="btn btn-secondary" @click="fecharFormulario">
+            <button type="button" class="btn btn-outline" @click="fecharFormulario">
               Cancelar
             </button>
             <button type="submit" class="btn btn-primary">

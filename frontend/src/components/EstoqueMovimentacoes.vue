@@ -2,7 +2,7 @@
   <div class="estoque-movimentacoes">
     <div class="section-header">
       <h3>Movimentações de Estoque</h3>
-      <button class="btn btn-primary" @click="abrirModalMovimentacao">
+      <button class="btn btn-create" @click="abrirModalMovimentacao">
         <i class="fas fa-plus"></i>
         Nova Movimentação
       </button>
@@ -113,7 +113,7 @@
     <!-- Paginação -->
     <div v-if="paginacao.total > paginacao.limite" class="pagination">
       <button 
-        class="btn btn-sm" 
+        class="btn btn-outline btn-sm" 
         :disabled="paginacao.pagina === 1"
         @click="mudarPagina(paginacao.pagina - 1)"
       >
@@ -125,7 +125,7 @@
       </span>
       
       <button 
-        class="btn btn-sm" 
+        class="btn btn-outline btn-sm" 
         :disabled="paginacao.pagina >= Math.ceil(paginacao.total / paginacao.limite)"
         @click="mudarPagina(paginacao.pagina + 1)"
       >
@@ -213,7 +213,7 @@
           </div>
 
           <div class="form-actions">
-            <button type="button" class="btn btn-secondary" @click="fecharModalMovimentacao">
+            <button type="button" class="btn btn-outline" @click="fecharModalMovimentacao">
               Cancelar
             </button>
             <button type="submit" class="btn btn-primary">
