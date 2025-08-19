@@ -6,23 +6,24 @@
         <!-- Botões de administração (apenas para admins) -->
         <div v-if="isAdmin" class="admin-actions">
           <button 
-            class="btn btn-outline-secondary btn-sm" 
+            class="btn btn-category" 
             @click="$router.push('/categories')"
             title="Gerenciar Categorias"
           >
             <i class="fas fa-folder"></i>
-            Categorias
+            Categoria
           </button>
           <button 
-            class="btn btn-outline-secondary btn-sm" 
+            class="btn btn-subcategory" 
             @click="$router.push('/subcategories')"
             title="Gerenciar Subcategorias"
           >
             <i class="fas fa-list"></i>
-            Subcategorias
+            SubCategoria
           </button>
         </div>
         <button class="btn btn-primary" @click="$router.push('/solicitacoes/create')">
+          <i class="fas fa-plus"></i>
           Nova Solicitação
         </button>
       </div>
@@ -139,6 +140,7 @@
       <h3>Nenhuma solicitação encontrada</h3>
       <p>Não há solicitações que correspondam aos filtros selecionados.</p>
       <button class="btn btn-primary" @click="$router.push('/solicitacoes/create')">
+        <i class="fas fa-plus"></i>
         Criar Primeira Solicitação
       </button>
     </div>
@@ -312,23 +314,47 @@ onMounted(() => {
 
 .admin-actions {
   display: flex;
+  gap: 0.75rem;
+}
+
+.btn-category {
+  background: #3498db;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  border: none;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
   gap: 0.5rem;
 }
 
-.btn-sm {
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
+.btn-category:hover {
+  background: #28a745;
+  transform: translateY(-1px);
 }
 
-.btn-outline-secondary {
-  background: transparent;
-  color: #6c757d;
-  border: 1px solid #6c757d;
-}
-
-.btn-outline-secondary:hover {
-  background: #6c757d;
+.btn-subcategory {
+  background: #3498db;
   color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  border: none;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-subcategory:hover {
+  background: #28a745;
+  transform: translateY(-1px);
 }
 
 .page-header h1 {
@@ -534,12 +560,12 @@ onMounted(() => {
 }
 
 .btn-primary {
-  background: var(--secondary-color);
+  background: #3498db;
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--secondary-hover);
+  background: #28a745;
   transform: translateY(-1px);
 }
 

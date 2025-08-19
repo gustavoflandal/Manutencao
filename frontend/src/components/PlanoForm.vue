@@ -1,11 +1,12 @@
 <template>
-  <div class="plano-form">
-    <div class="modal-header">
-      <h3>{{ isEdicao ? 'Editar Plano Preventivo' : 'Novo Plano Preventivo' }}</h3>
-      <button type="button" class="btn-close" @click="fechar">
-        <i class="fas fa-times"></i>
-      </button>
-    </div>
+  <div class="modal-overlay" @click="fechar">
+    <div class="plano-form" @click.stop>
+      <div class="modal-header">
+        <h3>{{ isEdicao ? 'Editar Plano Preventivo' : 'Novo Plano Preventivo' }}</h3>
+        <button type="button" class="btn-close" @click="fechar">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
 
     <form @submit.prevent="salvar" class="plano-form-content">
       <div class="form-group">
@@ -203,6 +204,7 @@
         </button>
       </div>
     </form>
+    </div>
   </div>
 </template>
 
@@ -219,9 +221,9 @@ export default {
       default: null
     }
   },
-  emits: ['fechar', 'salvo'],
+  emits: ['close', 'saved'],
   setup(props, { emit }) {
-    const { toast } = useToast()
+    const { showToast } = useToast()
     
     const salvando = ref(false)
     const setores = ref([])
@@ -301,24 +303,24 @@ export default {
 
         if (isEdicao) {
           await api.put(`/preventiva/planos/${props.plano.id}`, dados)
-          toast.success('Plano atualizado com sucesso!')
+          showToast('Plano atualizado com sucesso!', 'success')
         } else {
           await api.post('/preventiva/planos', dados)
-          toast.success('Plano criado com sucesso!')
+          showToast('Plano criado com sucesso!', 'success')
         }
 
-        emit('salvo')
+        emit('saved')
         fechar()
       } catch (error) {
         console.error('Erro ao salvar plano:', error)
-        toast.error(error.response?.data?.message || 'Erro ao salvar plano')
+        showToast(error.response?.data?.message || 'Erro ao salvar plano', 'error')
       } finally {
         salvando.value = false
       }
     }
 
     const fechar = () => {
-      emit('fechar')
+      emit('close')
     }
 
     onMounted(() => {
@@ -348,13 +350,28 @@ export default {
 </script>
 
 <style scoped>
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
 .plano-form {
   background: white;
   border-radius: 8px;
   max-width: 800px;
-  margin: 0 auto;
+  width: 100%;
   max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
 }
 
 .modal-header {
@@ -470,12 +487,12 @@ export default {
 }
 
 .btn-primary {
-  background: #007bff;
+  background: #3498db;
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #0056b3;
+  background: #28a745;
 }
 
 .btn-primary:disabled {
@@ -507,13 +524,17 @@ export default {
 }
 
 @media (max-width: 768px) {
+  .modal-overlay {
+    padding: 10px;
+  }
+  
   .form-row {
     grid-template-columns: 1fr;
   }
   
   .plano-form {
-    margin: 10px;
     max-width: none;
+    width: 100%;
   }
   
   .modal-header, .plano-form-content {

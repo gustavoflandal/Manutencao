@@ -176,6 +176,46 @@ onMounted(() => {
 <style scoped>
 .dashboard {
   padding: 2rem;
+  position: relative;
+  min-height: calc(100vh - 80px);
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+}
+
+.dashboard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 20% 50%, rgba(173, 181, 189, 0.02) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(108, 117, 125, 0.015) 0%, transparent 50%),
+    radial-gradient(circle at 40% 80%, rgba(173, 181, 189, 0.02) 0%, transparent 50%),
+    linear-gradient(45deg, transparent 40%, rgba(173, 181, 189, 0.01) 50%, transparent 60%);
+  background-size: 500px 500px, 400px 400px, 300px 300px, 150px 150px;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.dashboard::after {
+  content: 'UpKeep Pró 1.0';
+  position: absolute;
+  bottom: 2rem;
+  right: 2rem;
+  font-size: 2rem;
+  font-weight: 300;
+  color: rgba(108, 117, 125, 0.04);
+  z-index: 0;
+  pointer-events: none;
+  transform: rotate(-15deg);
+  letter-spacing: 2px;
+}
+
+.dashboard-header,
+.dashboard-content {
+  position: relative;
+  z-index: 1;
 }
 
 .dashboard-header {
@@ -186,6 +226,7 @@ onMounted(() => {
   color: var(--primary-color);
   font-size: 2rem;
   margin-bottom: 0.5rem;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .dashboard-header p {
@@ -201,11 +242,24 @@ onMounted(() => {
 }
 
 .card {
-  background: white;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
   border-radius: 12px;
   padding: 1.5rem;
-  box-shadow: var(--shadow);
-  border: 1px solid var(--border-color);
+  box-shadow: 
+    0 4px 6px rgba(0, 0, 0, 0.07),
+    0 1px 3px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(173, 181, 189, 0.2);
+  transition: all 0.3s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 25px rgba(0, 0, 0, 0.1),
+    0 4px 10px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .card h3 {
@@ -227,6 +281,7 @@ onMounted(() => {
   color: var(--secondary-color);
   line-height: 1;
   transition: opacity 0.3s ease;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .stats-number.loading {
@@ -253,6 +308,7 @@ onMounted(() => {
   color: var(--primary-color);
   font-size: 1.4rem;
   margin-bottom: 1rem;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
 .action-buttons {
@@ -268,42 +324,69 @@ onMounted(() => {
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .btn-primary {
-  background: var(--secondary-color);
+  background: rgba(52, 152, 219, 0.9);
   color: white;
+  border: 1px solid rgba(52, 152, 219, 0.3);
 }
 
 .btn-primary:hover {
-  background: var(--secondary-hover);
-  transform: translateY(-1px);
+  background: rgba(41, 128, 185, 0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 .btn-secondary {
-  background: var(--primary-color);
+  background: rgba(44, 62, 80, 0.9);
   color: white;
+  border: 1px solid rgba(44, 62, 80, 0.3);
 }
 
 .btn-secondary:hover {
-  background: var(--primary-hover);
-  transform: translateY(-1px);
+  background: rgba(52, 73, 94, 0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 .btn-outline {
-  background: transparent;
+  background: rgba(255, 255, 255, 0.8);
   color: var(--primary-color);
-  border: 2px solid var(--primary-color);
+  border: 2px solid rgba(44, 62, 80, 0.3);
 }
 
 .btn-outline:hover {
-  background: var(--primary-color);
+  background: rgba(44, 62, 80, 0.9);
   color: white;
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+@media (max-width: 768px) {
+  .dashboard::after {
+    font-size: 1.5rem;
+    bottom: 1rem;
+    right: 1rem;
+  }
+  
+  .dashboard {
+    padding: 1rem;
+  }
+  
+  .dashboard-cards {
+    grid-template-columns: 1fr;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
 }
 </style>

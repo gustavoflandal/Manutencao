@@ -8,8 +8,8 @@
 
 :root {
   /* Cores específicas para botões */
-  --btn-create: #28a745;      /* Verde para criar/adicionar */
-  --btn-create-hover: #218838;
+  --btn-create: #3498db;      /* Azul para criar/adicionar */
+  --btn-create-hover: #28a745; /* Verde para hover */
   --btn-create-light: #d4edda;
   
   --btn-edit: #17a2b8;        /* Azul claro para editar */
@@ -24,8 +24,8 @@
   --btn-delete-hover: #c82333;
   --btn-delete-light: #f8d7da;
   
-  --btn-primary: #007bff;     /* Azul principal para ações primárias */
-  --btn-primary-hover: #0056b3;
+  --btn-primary: #3498db;     /* Azul principal para ações primárias */
+  --btn-primary-hover: #28a745;  /* Verde para hover */
   --btn-primary-light: #cce7ff;
   
   --btn-secondary: #6c757d;   /* Cinza para ações secundárias */

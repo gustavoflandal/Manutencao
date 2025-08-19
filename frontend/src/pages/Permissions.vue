@@ -3,15 +3,17 @@
     <header class="page-header">
       <h1>Gerenciamento de Permissões</h1>
       <div class="header-actions">
+        <button class="btn btn-outline" @click="$router.push('/users')">
+          <i class="fas fa-arrow-left"></i>
+          Voltar para Usuários
+        </button>
         <button 
           v-if="canCreatePermissions" 
-          class="btn btn-secondary" 
+          class="btn btn-create" 
           @click="showCreatePermissionModal = true"
         >
+          <i class="fas fa-plus"></i>
           Nova Permissão
-        </button>
-        <button class="btn btn-outline" @click="$router.push('/users')">
-          Voltar para Usuários
         </button>
       </div>
     </header>
@@ -59,6 +61,7 @@
                       @click="grantPermission(permission.id)"
                       :disabled="loading"
                     >
+                      <i class="fas fa-plus"></i>
                       Conceder
                     </button>
                   </div>
@@ -91,6 +94,7 @@
                       @click="revokePermission(permission.id)"
                       :disabled="loading"
                     >
+                      <i class="fas fa-times"></i>
                       Revogar
                     </button>
                   </div>
@@ -221,9 +225,12 @@
 
           <div class="form-actions">
             <button type="button" class="btn btn-outline" @click="closeCreateModal">
+              <i class="fas fa-times"></i>
               Cancelar
             </button>
             <button type="submit" class="btn btn-primary" :disabled="loading">
+              <i v-if="loading" class="fas fa-spinner fa-spin"></i>
+              <i v-else class="fas fa-save"></i>
               {{ loading ? 'Criando...' : 'Criar Permissão' }}
             </button>
           </div>
@@ -724,12 +731,22 @@ td {
 }
 
 .btn-primary {
-  background: var(--secondary-color);
+  background: #3498db;
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--secondary-hover);
+  background: #28a745;
+}
+
+.btn-create {
+  background: #3498db;
+  color: white;
+}
+
+.btn-create:hover:not(:disabled) {
+  background: #28a745;
+  transform: translateY(-1px);
 }
 
 .btn-secondary {

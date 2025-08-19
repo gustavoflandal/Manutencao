@@ -639,7 +639,7 @@ tr:last-child td {
   background: var(--color-white);
   border-radius: var(--border-radius-lg);
   width: 90%;
-  max-width: 600px;
+  max-width: 800px;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: var(--shadow-xl);
@@ -678,14 +678,17 @@ tr:last-child td {
 }
 
 .modal-form {
-  padding: 1.5rem;
+  padding: 2rem;
+  box-sizing: border-box;
 }
 
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 1.5rem;
   margin-bottom: 1rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .form-group {
@@ -752,6 +755,7 @@ tr:last-child td {
   
   .modal-container {
     width: 95%;
+    max-width: 95vw;
     margin: 1rem;
   }
 }

@@ -197,6 +197,8 @@
             Cancelar
           </button>
           <button type="submit" class="btn btn-primary" :disabled="loading">
+            <i v-if="loading" class="fas fa-spinner fa-spin"></i>
+            <i v-else :class="isEdit ? 'fas fa-save' : 'fas fa-plus'"></i>
             <span v-if="loading">Salvando...</span>
             <span v-else>{{ isEdit ? 'Salvar Alterações' : 'Criar Solicitação' }}</span>
           </button>
@@ -529,12 +531,12 @@ onMounted(async () => {
 }
 
 .btn-primary {
-  background: var(--secondary-color);
+  background: #3498db;
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--secondary-hover);
+  background: #28a745;
   transform: translateY(-1px);
 }
 

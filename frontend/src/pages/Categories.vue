@@ -1,11 +1,19 @@
 <template>
   <div class="categories-page">
     <header class="page-header">
-      <h1>Gerenciamento de Categorias</h1>
-      <button @click="showCreateForm = true" class="btn btn-create">
-        <i class="fas fa-plus"></i>
-        Nova Categoria
-      </button>
+      <div>
+        <h1>Gerenciamento de Categorias</h1>
+      </div>
+      <div class="header-actions">
+        <button @click="$router.back()" class="btn btn-outline">
+          <i class="fas fa-arrow-left"></i>
+          Voltar
+        </button>
+        <button @click="showCreateForm = true" class="btn btn-create">
+          <i class="fas fa-plus"></i>
+          Nova Categoria
+        </button>
+      </div>
     </header>
 
     <div class="page-content">
@@ -634,7 +642,7 @@ export default {
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   margin-bottom: 2rem;
 }
 
@@ -642,6 +650,11 @@ export default {
   color: var(--color-primary);
   font-size: 2rem;
   margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: var(--spacing-sm);
 }
 
 .page-content {
@@ -811,12 +824,22 @@ export default {
 }
 
 .btn-primary {
-  background-color: var(--color-secondary);
+  background-color: #3498db;
   color: white;
 }
 
 .btn-primary:hover {
-  background-color: var(--color-secondary-dark);
+  background-color: #28a745;
+}
+
+.btn-create {
+  background-color: #3498db;
+  color: white;
+}
+
+.btn-create:hover {
+  background-color: #28a745;
+  transform: translateY(-1px);
 }
 
 .btn-sm {

@@ -112,52 +112,54 @@
         </div>
 
         <form @submit.prevent="salvarFornecedor">
-          <div class="form-group">
-            <label for="nome">Nome *</label>
-            <input
-              type="text"
-              id="nome"
-              v-model="formulario.nome"
-              class="form-control"
-              required
-              maxlength="100"
-            />
-          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="nome">Nome *</label>
+              <input
+                type="text"
+                id="nome"
+                v-model="formulario.nome"
+                class="form-control"
+                required
+                maxlength="100"
+              />
+            </div>
 
-          <div class="form-group">
-            <label for="cnpj">CNPJ</label>
-            <input
-              type="text"
-              id="cnpj"
-              v-model="formulario.cnpj"
-              class="form-control"
-              placeholder="00.000.000/0000-00"
-              maxlength="18"
-              @input="formatarCNPJInput"
-            />
-          </div>
+            <div class="form-group">
+              <label for="cnpj">CNPJ</label>
+              <input
+                type="text"
+                id="cnpj"
+                v-model="formulario.cnpj"
+                class="form-control"
+                placeholder="00.000.000/0000-00"
+                maxlength="18"
+                @input="formatarCNPJInput"
+              />
+            </div>
 
-          <div class="form-group">
-            <label for="email">Email</label>
-            <input
-              type="email"
-              id="email"
-              v-model="formulario.email"
-              class="form-control"
-              maxlength="100"
-            />
-          </div>
+            <div class="form-group">
+              <label for="email">Email</label>
+              <input
+                type="email"
+                id="email"
+                v-model="formulario.email"
+                class="form-control"
+                maxlength="100"
+              />
+            </div>
 
-          <div class="form-group">
-            <label for="telefone">Telefone</label>
-            <input
-              type="text"
-              id="telefone"
-              v-model="formulario.telefone"
-              class="form-control"
-              placeholder="(11) 99999-9999"
-              maxlength="15"
-            />
+            <div class="form-group">
+              <label for="telefone">Telefone</label>
+              <input
+                type="text"
+                id="telefone"
+                v-model="formulario.telefone"
+                class="form-control"
+                placeholder="(11) 99999-9999"
+                maxlength="15"
+              />
+            </div>
           </div>
 
           <div class="form-group">
@@ -166,7 +168,7 @@
               id="endereco"
               v-model="formulario.endereco"
               class="form-control"
-              rows="3"
+              rows="2"
               maxlength="300"
             ></textarea>
           </div>
@@ -177,7 +179,7 @@
               id="observacoes"
               v-model="formulario.observacoes"
               class="form-control"
-              rows="3"
+              rows="2"
               maxlength="500"
             ></textarea>
           </div>
@@ -194,9 +196,11 @@
 
           <div class="form-actions">
             <button type="button" class="btn btn-outline" @click="fecharFormulario">
+              <i class="fas fa-times"></i>
               Cancelar
             </button>
             <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save"></i>
               {{ modalFormulario.editando ? 'Atualizar' : 'Criar' }}
             </button>
           </div>
@@ -566,16 +570,42 @@ export default {
   align-items: center;
   gap: 5px;
   text-decoration: none;
-  transition: all 0.2s;
+  transition: all 0.3s;
+  font-weight: 500;
+}
+
+.btn-create {
+  background: #3498db;
+  color: white;
+  padding: 0.75rem 1.5rem;
+}
+
+.btn-create:hover {
+  background: #28a745;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 .btn-primary {
-  background: #007bff;
+  background: #3498db;
   color: white;
 }
 
 .btn-primary:hover {
-  background: #0056b3;
+  background: #28a745;
+  transform: translateY(-1px);
+}
+
+.btn-outline {
+  background: transparent;
+  color: #3498db;
+  border: 2px solid #3498db;
+}
+
+.btn-outline:hover {
+  background: #3498db;
+  color: white;
+  transform: translateY(-1px);
 }
 
 .btn-secondary {
@@ -605,9 +635,10 @@ export default {
   background: white;
   border-radius: 8px;
   width: 90%;
-  max-width: 600px;
+  max-width: 800px;
   max-height: 90vh;
   overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
 }
 
 .modal-header {
@@ -635,7 +666,15 @@ export default {
 }
 
 .modal-content form {
-  padding: 20px;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
 }
 
 .form-group {
@@ -685,6 +724,20 @@ export default {
   
   .fornecedores-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .modal-content {
+    width: 95%;
+    max-width: 95vw;
+    margin: 1rem;
+  }
+  
+  .modal-content form {
+    padding: 1.5rem;
   }
 }
 </style>

@@ -96,6 +96,113 @@
         </table>
       </div>
     </div>
+
+    <!-- Modal de Cadastro de Usuário -->
+    <div v-if="showCreateForm" class="modal-overlay" @click="closeCreateForm">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h2>
+            <i class="fas fa-user-plus"></i>
+            Novo Usuário
+          </h2>
+          <button @click="closeCreateForm" class="modal-close">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <form @submit.prevent="createUser" class="modal-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="nome">Nome Completo *</label>
+              <input
+                id="nome"
+                v-model="createForm.nome"
+                type="text"
+                class="form-input"
+                placeholder="Digite o nome completo"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="email">Email *</label>
+              <input
+                id="email"
+                v-model="createForm.email"
+                type="email"
+                class="form-input"
+                placeholder="Digite o email"
+                required
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="perfil">Perfil *</label>
+              <select
+                id="perfil"
+                v-model="createForm.perfil"
+                class="form-input"
+                required
+              >
+                <option value="">Selecione o perfil</option>
+                <option value="solicitante">Solicitante</option>
+                <option value="tecnico">Técnico</option>
+                <option value="supervisor">Supervisor</option>
+                <option value="administrador">Administrador</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="departamento">Departamento</label>
+              <input
+                id="departamento"
+                v-model="createForm.departamento"
+                type="text"
+                class="form-input"
+                placeholder="Digite o departamento"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="senha">Senha *</label>
+              <input
+                id="senha"
+                v-model="createForm.senha"
+                type="password"
+                class="form-input"
+                placeholder="Digite a senha"
+                required
+                minlength="6"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="confirmSenha">Confirmar Senha *</label>
+              <input
+                id="confirmSenha"
+                v-model="createForm.confirmSenha"
+                type="password"
+                class="form-input"
+                placeholder="Confirme a senha"
+                required
+                minlength="6"
+              />
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" @click="closeCreateForm" class="btn btn-secondary">
+              <i class="fas fa-times"></i>
+              Cancelar
+            </button>
+            <button type="submit" :disabled="isCreating" class="btn btn-primary">
+              <i class="fas fa-save"></i>
+              {{ isCreating ? 'Criando...' : 'Criar Usuário' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -114,6 +221,18 @@ const users = ref([])
 const searchTerm = ref('')
 const selectedRole = ref('')
 const loading = ref(false)
+
+// Modal de cadastro
+const showCreateForm = ref(false)
+const isCreating = ref(false)
+const createForm = ref({
+  nome: '',
+  email: '',
+  perfil: '',
+  departamento: '',
+  senha: '',
+  confirmSenha: ''
+})
 
 const canCreateUsers = computed(() => {
   return authStore.user?.perfil === 'administrador'
@@ -204,6 +323,60 @@ const verificarToken = async () => {
   }
 }
 
+// Funções do modal
+const closeCreateForm = () => {
+  showCreateForm.value = false
+  resetCreateForm()
+}
+
+const resetCreateForm = () => {
+  createForm.value = {
+    nome: '',
+    email: '',
+    perfil: '',
+    departamento: '',
+    senha: '',
+    confirmSenha: ''
+  }
+}
+
+const createUser = async () => {
+  // Validar se as senhas coincidem
+  if (createForm.value.senha !== createForm.value.confirmSenha) {
+    error('Erro de validação', 'As senhas não coincidem')
+    return
+  }
+
+  try {
+    isCreating.value = true
+    
+    const userData = {
+      nome: createForm.value.nome,
+      email: createForm.value.email,
+      perfil: createForm.value.perfil,
+      departamento: createForm.value.departamento,
+      senha: createForm.value.senha
+    }
+
+    const response = await api.post('/users', userData)
+    
+    if (response.data.success) {
+      success('Usuário criado', 'Usuário criado com sucesso')
+      closeCreateForm()
+      await loadUsers() // Recarregar lista
+    }
+  } catch (err) {
+    console.error('Erro ao criar usuário:', err)
+    if (err.response?.data?.message) {
+      error('Erro ao criar usuário', err.response.data.message)
+    } else {
+      error('Erro ao criar usuário', 'Não foi possível criar o usuário')
+    }
+  } finally {
+    isCreating.value = false
+  }
+}
+
 onMounted(() => {
   // Verificar se o usuário está autenticado
   if (!authStore.user && authStore.token) {
@@ -232,6 +405,21 @@ onMounted(() => {
   color: var(--primary-color);
   font-size: 2rem;
   margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.btn-create {
+  background: #3498db;
+  color: white;
+}
+
+.btn-create:hover {
+  background: #28a745;
 }
 
 .users-filters {
@@ -355,21 +543,48 @@ tr:last-child td {
 }
 
 .btn-primary {
-  background: var(--secondary-color);
+  background: #3498db;
   color: white;
 }
 
 .btn-primary:hover {
-  background: var(--secondary-hover);
+  background: #28a745;
 }
 
 .btn-secondary {
-  background: var(--primary-color);
+  background: #6c757d;
   color: white;
 }
 
 .btn-secondary:hover {
-  background: var(--primary-hover);
+  background: #5a6268;
+}
+
+.btn-edit {
+  background: #3498db;
+  color: white;
+}
+
+.btn-edit:hover {
+  background: #28a745;
+}
+
+.btn-view {
+  background: #17a2b8;
+  color: white;
+}
+
+.btn-view:hover {
+  background: #138496;
+}
+
+.btn-delete {
+  background: #dc3545;
+  color: white;
+}
+
+.btn-delete:hover {
+  background: #c82333;
 }
 
 .btn-info {
@@ -395,5 +610,152 @@ tr:last-child td {
   color: var(--text-secondary);
   padding: 2rem;
   font-style: italic;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #eee;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px 12px 0 0;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.modal-close {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.modal-body {
+  padding: 2rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group label {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.form-group .form-input {
+  padding: 0.75rem 1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: white;
+}
+
+.form-group .form-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #eee;
+}
+
+.form-actions .btn {
+  padding: 0.75rem 1.5rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+@media (max-width: 768px) {
+  .modal-content {
+    width: 95%;
+    margin: 1rem;
+  }
+  
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+  
+  .modal-header {
+    padding: 1rem;
+  }
+  
+  .modal-body {
+    padding: 1rem;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+  }
+  
+  .form-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
 }
 </style>

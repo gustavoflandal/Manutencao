@@ -4,7 +4,8 @@
     <nav v-if="authStore.isAuthenticated" class="navbar">
       <div class="navbar-brand">
         <router-link to="/dashboard" class="brand-link">
-          🔧 Sistema de Manutenção
+          <span class="brand-icon">⚙️</span>
+          <span class="brand-text">UpKeep Pró 1.0</span>
         </router-link>
       </div>
       
@@ -17,7 +18,6 @@
         <router-link v-if="authStore.hasRole('tecnico')" to="/estoque" class="nav-link">Estoque</router-link>
         <router-link v-if="authStore.hasRole('supervisor')" to="/users" class="nav-link">Usuários</router-link>
         <router-link to="/departments" class="nav-link">Departamentos</router-link>
-        <router-link v-if="authStore.hasRole('administrador')" to="/categories" class="nav-link">Categorias</router-link>
         <router-link v-if="authStore.hasRole('supervisor')" to="/permissions" class="nav-link">Permissões</router-link>
         <router-link to="/profile" class="nav-link">Perfil</router-link>
         <button @click="handleLogout" class="nav-button">Sair</button>
@@ -85,7 +85,25 @@ const handleLogout = () => {
 #app {
   min-height: 100vh;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #f8f9fa;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  position: relative;
+}
+
+#app::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 20% 80%, rgba(173, 181, 189, 0.015) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(108, 117, 125, 0.01) 0%, transparent 50%),
+    radial-gradient(circle at 40% 40%, rgba(173, 181, 189, 0.01) 0%, transparent 50%);
+  background-size: 600px 600px, 500px 500px, 400px 400px;
+  background-attachment: fixed;
+  z-index: -1;
+  pointer-events: none;
 }
 
 /* Variáveis CSS locais para compatibilidade */
@@ -114,6 +132,19 @@ const handleLogout = () => {
   text-decoration: none;
   font-size: 1.5rem;
   font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.brand-icon {
+  font-size: 1.8rem;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.brand-text {
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .navbar-menu {

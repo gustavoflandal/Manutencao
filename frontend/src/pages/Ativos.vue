@@ -256,9 +256,11 @@
           
           <div class="modal-actions">
             <button type="button" @click="fecharModal" class="btn btn-outline">
+              <i class="fas fa-times"></i>
               Cancelar
             </button>
             <button type="submit" class="btn btn-primary" :disabled="salvando">
+              <i class="fas fa-save"></i>
               {{ salvando ? 'Salvando...' : 'Salvar Ativo' }}
             </button>
           </div>
@@ -722,6 +724,52 @@ tr:last-child td {
   text-transform: uppercase;
 }
 
+/* Botões */
+.btn {
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.btn-create,
+.btn-primary {
+  background: #3498db;
+  color: white;
+}
+
+.btn-create:hover,
+.btn-primary:hover {
+  background: #28a745;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.btn-outline {
+  background: transparent;
+  color: #3498db;
+  border: 2px solid #3498db;
+}
+
+.btn-outline:hover {
+  background: #3498db;
+  color: white;
+  transform: translateY(-1px);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
 /* Modal styles */
 .modal-overlay {
   position: fixed;
@@ -740,7 +788,7 @@ tr:last-child td {
   background: var(--color-white);
   border-radius: var(--border-radius-lg);
   width: 90%;
-  max-width: 600px;
+  max-width: 800px;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: var(--shadow-xl);
@@ -779,14 +827,17 @@ tr:last-child td {
 }
 
 .modal-form {
-  padding: 1.5rem;
+  padding: 2rem;
+  box-sizing: border-box;
 }
 
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 1.5rem;
   margin-bottom: 1rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .form-group {
@@ -836,7 +887,12 @@ tr:last-child td {
   
   .modal-container {
     width: 95%;
+    max-width: 95vw;
     margin: 1rem;
+  }
+  
+  .modal-form {
+    padding: 1.5rem;
   }
 }
 </style>

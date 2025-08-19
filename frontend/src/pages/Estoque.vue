@@ -66,7 +66,11 @@
       <div class="tab-content">
         <!-- Tab Itens -->
         <div v-if="activeTab === 'itens'" class="tab-panel">
-          <EstoqueItens @update-resumo="carregarResumo" />
+          <EstoqueItens 
+            @update-resumo="carregarResumo" 
+            @abrir-formulario="abrirFormularioItem"
+            @editar-item="editarItem"
+          />
         </div>
 
         <!-- Tab Categorias -->
@@ -124,6 +128,140 @@
       </div>
     </div>
 
+    <!-- Modal de Formulário de Item -->
+    <div v-if="modalFormulario.aberto" class="modal-overlay" @click="fecharFormularioItem">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h4>{{ modalFormulario.editando ? 'Editar' : 'Novo' }} Item</h4>
+          <button class="btn-close" @click="fecharFormularioItem">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+
+        <form @submit.prevent="salvarItem">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="nome">Nome *</label>
+              <input
+                type="text"
+                id="nome"
+                v-model="formularioItem.nome"
+                class="form-control"
+                required
+                maxlength="100"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="codigo">Código</label>
+              <input
+                type="text"
+                id="codigo"
+                v-model="formularioItem.codigo"
+                class="form-control"
+                maxlength="50"
+                placeholder="Código único do item"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="categoria">Categoria</label>
+              <select v-model="formularioItem.categoria_id" class="form-control">
+                <option value="">Selecione uma categoria</option>
+                <option v-for="categoria in categorias" :key="categoria.id" :value="categoria.id">
+                  {{ categoria.nome }}
+                </option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="fornecedor">Fornecedor</label>
+              <select v-model="formularioItem.fornecedor_id" class="form-control">
+                <option value="">Selecione um fornecedor</option>
+                <option v-for="fornecedor in fornecedores" :key="fornecedor.id" :value="fornecedor.id">
+                  {{ fornecedor.nome }}
+                </option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="unidade">Unidade de Medida</label>
+              <select v-model="formularioItem.unidade_medida" class="form-control">
+                <option value="">Selecione</option>
+                <option value="un">Unidade (un)</option>
+                <option value="kg">Quilograma (kg)</option>
+                <option value="l">Litro (l)</option>
+                <option value="m">Metro (m)</option>
+                <option value="m2">Metro² (m²)</option>
+                <option value="m3">Metro³ (m³)</option>
+                <option value="cx">Caixa (cx)</option>
+                <option value="pc">Peça (pc)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="preco">Preço Unitário</label>
+              <input
+                type="number"
+                id="preco"
+                v-model.number="formularioItem.preco_unitario"
+                class="form-control"
+                step="0.01"
+                min="0"
+                placeholder="0,00"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="estoque_minimo">Estoque Mínimo</label>
+              <input
+                type="number"
+                id="estoque_minimo"
+                v-model.number="formularioItem.estoque_minimo"
+                class="form-control"
+                min="0"
+                placeholder="0"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="localizacao">Localização</label>
+              <input
+                type="text"
+                id="localizacao"
+                v-model="formularioItem.localizacao"
+                class="form-control"
+                maxlength="100"
+                placeholder="Ex: Prateleira A1"
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="descricao">Descrição</label>
+            <textarea
+              id="descricao"
+              v-model="formularioItem.descricao"
+              class="form-control"
+              rows="3"
+              maxlength="500"
+            ></textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" class="btn btn-outline" @click="fecharFormularioItem">
+              <i class="fas fa-times"></i>
+              Cancelar
+            </button>
+            <button type="submit" class="btn btn-primary">
+              <i class="fas fa-save"></i>
+              {{ modalFormulario.editando ? 'Atualizar' : 'Criar' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Botão de Alertas Flutuante -->
     <button 
       v-if="totalAlertas > 0"
@@ -175,6 +313,29 @@ export default {
       criticos: [],
       proximos_vencimento: []
     })
+
+    // Modal de formulário de item
+    const modalFormulario = reactive({
+      aberto: false,
+      editando: false,
+      itemId: null
+    })
+
+    const formularioItem = reactive({
+      nome: '',
+      codigo: '',
+      descricao: '',
+      categoria_id: '',
+      fornecedor_id: '',
+      unidade_medida: '',
+      preco_unitario: 0,
+      estoque_minimo: 0,
+      localizacao: ''
+    })
+
+    // Dados para selects
+    const categorias = ref([])
+    const fornecedores = ref([])
 
     const tabs = [
       { id: 'itens', label: 'Itens', icon: 'fas fa-boxes' },
@@ -242,9 +403,106 @@ export default {
       }
     }
 
+    // Carregar dados para selects
+    const carregarCategorias = async () => {
+      try {
+        const response = await api.get('/estoque/categorias')
+        categorias.value = response.data.data || []
+      } catch (error) {
+        console.error('Erro ao carregar categorias:', error)
+      }
+    }
+
+    const carregarFornecedores = async () => {
+      try {
+        const response = await api.get('/estoque/fornecedores')
+        fornecedores.value = response.data.data || []
+      } catch (error) {
+        console.error('Erro ao carregar fornecedores:', error)
+      }
+    }
+
+    // Funções do modal de item
+    const abrirFormularioItem = () => {
+      modalFormulario.aberto = true
+      modalFormulario.editando = false
+      modalFormulario.itemId = null
+      
+      // Limpar formulário
+      Object.assign(formularioItem, {
+        nome: '',
+        codigo: '',
+        descricao: '',
+        categoria_id: '',
+        fornecedor_id: '',
+        unidade_medida: '',
+        preco_unitario: 0,
+        estoque_minimo: 0,
+        localizacao: ''
+      })
+    }
+
+    const editarItem = (item) => {
+      modalFormulario.aberto = true
+      modalFormulario.editando = true
+      modalFormulario.itemId = item.id
+      
+      // Preencher formulário
+      Object.assign(formularioItem, {
+        nome: item.nome,
+        codigo: item.codigo || '',
+        descricao: item.descricao || '',
+        categoria_id: item.categoria_id || '',
+        fornecedor_id: item.fornecedor_id || '',
+        unidade_medida: item.unidade_medida || '',
+        preco_unitario: item.preco_unitario || 0,
+        estoque_minimo: item.estoque_minimo || 0,
+        localizacao: item.localizacao || ''
+      })
+    }
+
+    const fecharFormularioItem = () => {
+      modalFormulario.aberto = false
+      modalFormulario.editando = false
+      modalFormulario.itemId = null
+    }
+
+    const salvarItem = async () => {
+      try {
+        const dados = {
+          nome: formularioItem.nome,
+          codigo: formularioItem.codigo || null,
+          descricao: formularioItem.descricao || null,
+          categoria_id: formularioItem.categoria_id || null,
+          fornecedor_id: formularioItem.fornecedor_id || null,
+          unidade_medida: formularioItem.unidade_medida || null,
+          preco_unitario: formularioItem.preco_unitario || 0,
+          estoque_minimo: formularioItem.estoque_minimo || 0,
+          localizacao: formularioItem.localizacao || null
+        }
+
+        if (modalFormulario.editando) {
+          await api.put(`/estoque/itens/${modalFormulario.itemId}`, dados)
+          toast.success('Item atualizado com sucesso!')
+        } else {
+          await api.post('/estoque/itens', dados)
+          toast.success('Item criado com sucesso!')
+        }
+        
+        fecharFormularioItem()
+        await carregarResumo()
+      } catch (error) {
+        console.error('Erro ao salvar item:', error)
+        const message = error.response?.data?.message || 'Erro ao salvar item'
+        toast.error(message)
+      }
+    }
+
     onMounted(() => {
       carregarResumo()
       carregarAlertas()
+      carregarCategorias()
+      carregarFornecedores()
       
       // Atualizar alertas a cada 5 minutos
       setInterval(carregarAlertas, 5 * 60 * 1000)
@@ -256,11 +514,19 @@ export default {
       loading,
       resumo,
       alertas,
+      modalFormulario,
+      formularioItem,
+      categorias,
+      fornecedores,
       tabs,
       totalAlertas,
       formatCurrency,
       carregarResumo,
-      carregarAlertas
+      carregarAlertas,
+      abrirFormularioItem,
+      editarItem,
+      fecharFormularioItem,
+      salvarItem
     }
   }
 }
@@ -536,6 +802,128 @@ export default {
   color: #e74c3c;
 }
 
+.text-danger {
+  color: #e74c3c;
+}
+
+/* Modal de formulário */
+.modal-content {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.modal-content .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2rem;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-content .modal-header h4 {
+  margin: 0;
+  color: #333;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #999;
+}
+
+.btn-close:hover {
+  color: #333;
+}
+
+.modal-content form {
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #333;
+}
+
+.form-control {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #3498db;
+  box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.25);
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  text-decoration: none;
+  transition: all 0.3s;
+  font-weight: 500;
+}
+
+.btn-primary {
+  background: #3498db;
+  color: white;
+}
+
+.btn-primary:hover {
+  background: #28a745;
+  transform: translateY(-1px);
+}
+
+.btn-outline {
+  background: transparent;
+  color: #3498db;
+  border: 2px solid #3498db;
+}
+
+.btn-outline:hover {
+  background: #3498db;
+  color: white;
+  transform: translateY(-1px);
+}
+
 @media (max-width: 768px) {
   .tabs {
     flex-direction: column;
@@ -551,6 +939,20 @@ export default {
     width: 50px;
     height: 50px;
     font-size: 20px;
+  }
+  
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .modal-content {
+    width: 95%;
+    max-width: 95vw;
+    margin: 1rem;
+  }
+  
+  .modal-content form {
+    padding: 1.5rem;
   }
 }
 </style>

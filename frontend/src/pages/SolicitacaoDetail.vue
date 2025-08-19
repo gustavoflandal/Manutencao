@@ -125,6 +125,8 @@
                 @click="assignResponsible"
                 :disabled="!selectedResponsible || assigning"
               >
+                <i v-if="assigning" class="fas fa-spinner fa-spin"></i>
+                <i v-else class="fas fa-user-check"></i>
                 {{ assigning ? 'Atribuindo...' : 'Atribuir' }}
               </button>
             </div>
@@ -190,6 +192,7 @@
       <h3>Solicitação não encontrada</h3>
       <p>A solicitação que você está procurando não existe ou foi removida.</p>
       <button class="btn btn-primary" @click="$router.push('/solicitacoes')">
+        <i class="fas fa-arrow-left"></i>
         Voltar para Lista
       </button>
     </div>
@@ -632,7 +635,8 @@ onMounted(async () => {
   font-size: 0.9rem;
 }
 
-.btn-primary { background: var(--secondary-color); color: white; }
+.btn-primary { background: #3498db; color: white; }
+.btn-primary:hover { background: #28a745; }
 .btn-secondary { background: var(--primary-color); color: white; }
 .btn-outline { background: transparent; color: var(--primary-color); border: 2px solid var(--primary-color); }
 .btn-info { background: #17a2b8; color: white; }
