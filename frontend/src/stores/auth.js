@@ -178,17 +178,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   // Inicializar quando store é criado
   const initialize = async () => {
-    console.log('🔧 Inicializando auth store...')
-    console.log('  Token existe:', !!token.value)
-    console.log('  User existe:', !!user.value)
-    
     if (token.value && !user.value) {
       try {
-        console.log('  Verificando token...')
         await verifyToken()
-        console.log('  Token válido! Usuário:', user.value?.nome, 'Perfil:', user.value?.perfil)
       } catch (error) {
-        console.log('  Token inválido, fazendo logout')
         // Token inválido, fazer logout silencioso
         logout()
       }

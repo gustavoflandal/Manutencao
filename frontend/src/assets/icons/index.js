@@ -1,26 +1,39 @@
 // Ícones do Lucide (Vue 3) - Corrigido com ícones existentes
 import { 
-  Wrench, Hammer, Drill, Settings, Cog, ToolCase,
+  Wrench, Hammer, Drill, Settings, Cog, Briefcase,
   Monitor, Laptop, Smartphone, Tablet, Server, Printer, Camera,
   Truck, Car, Bus, Bike, Train, Plane,
-  Factory, Cpu, HardDrive, MemoryStick,
+  Factory, Cpu, HardDrive,
   Zap, Battery, BatteryCharging, Plug, Power, Cable,
-  Droplets, ShowerHead, Waves, Thermometer, Wind, Gauge,
+  Droplets, Waves, Thermometer, Wind, Gauge,
   Shield, ShieldCheck, AlertTriangle, Lock, Key, Eye,
-  BrushCleaning, Trash2, Recycle, WashingMachine,
+  Trash2, Recycle,
   Folder, FolderOpen, File, FileText, Archive, Package,
   Users, User, UserCheck, Building, Home, MapPin,
   Clock, Calendar, Timer, Watch, AlarmClock,
-  Heart, Stethoscope, Pill, Cross, Bandage, Syringe,
-  Lightbulb, Fan, AirVent, Heater, Refrigerator, Microwave,
-  ShoppingCart, Package2, Barcode, QrCode, Receipt, CreditCard,
-  Wifi, Bluetooth, Radio, Antenna, Router, Smartphone as Phone,
-  Star, StarHalf, Award, Medal, Trophy, Crown,
+  Heart, Stethoscope, Pill, Plus, Bandage,
+  Lightbulb, Fan, Refrigerator, Microwave,
+  ShoppingCart, Barcode, Hash, CreditCard,
+  Wifi, Bluetooth, Radio, Router, Smartphone as Phone,
+  Star, Award, Trophy,
   Search, Filter, SlidersHorizontal, List, Grid3X3, Table,
   Upload, Download, Share, Copy, Scissors, Clipboard,
-  Volume2, VolumeX, Play, Pause, Square, SkipForward,
-  MapPin as Location, Navigation, Compass, Map, Route, Flag
+  Volume2, VolumeX, Play, Pause, Square, ChevronRight,
+  Navigation, Compass
 } from 'lucide-vue-next'
+
+// Criar aliases para ícones que não existem
+const Syringe = Plus
+const QrCode = Hash  
+const Receipt = FileText
+const Medal = Star
+const Crown = Star
+const SkipForward = ChevronRight
+const Location = MapPin
+const Map = MapPin
+const Route = MapPin
+const Flag = MapPin
+const Cross = Plus
 
 // Ícones padrão do sistema de manutenção (corrigido)
 export const systemIcons = [
@@ -28,7 +41,7 @@ export const systemIcons = [
   { name: 'wrench', component: Wrench, category: 'ferramentas', description: 'Chave inglesa' },
   { name: 'hammer', component: Hammer, category: 'ferramentas', description: 'Martelo' },
   { name: 'drill', component: Drill, category: 'ferramentas', description: 'Furadeira' },
-  { name: 'tool-case', component: ToolCase, category: 'ferramentas', description: 'Caixa de ferramentas' },
+  { name: 'tool-case', component: Briefcase, category: 'ferramentas', description: 'Caixa de ferramentas' },
   { name: 'settings', component: Settings, category: 'ferramentas', description: 'Configurações' },
   { name: 'cog', component: Cog, category: 'ferramentas', description: 'Engrenagem' },
 
@@ -54,7 +67,7 @@ export const systemIcons = [
   { name: 'gear', component: Cog, category: 'industrial', description: 'Engrenagem' },
   { name: 'cpu', component: Cpu, category: 'industrial', description: 'Processador' },
   { name: 'hard-drive', component: HardDrive, category: 'industrial', description: 'Disco rígido' },
-  { name: 'memory-stick', component: MemoryStick, category: 'industrial', description: 'Memória' },
+  { name: 'memory-stick', component: HardDrive, category: 'industrial', description: 'Memória' },
 
   // === ELÉTRICA E ENERGIA ===
   { name: 'zap', component: Zap, category: 'eletrica', description: 'Energia elétrica' },
@@ -65,9 +78,9 @@ export const systemIcons = [
   { name: 'cable', component: Cable, category: 'eletrica', description: 'Cabo' },
 
   // === HIDRÁULICA E CLIMATIZAÇÃO ===
-  { name: 'droplets', component: Droplets, category: 'hidraulica', description: 'Água/Gotejamento' },
-  { name: 'shower-head', component: ShowerHead, category: 'hidraulica', description: 'Chuveiro' },
-  { name: 'waves', component: Waves, category: 'hidraulica', description: 'Ondas/Água' },
+    { name: 'droplets', component: Droplets, category: 'hidraulica', description: 'Água' },
+  { name: 'shower-head', component: Droplets, category: 'hidraulica', description: 'Chuveiro' },
+  { name: 'waves', component: Waves, category: 'hidraulica', description: 'Ondas' },
   { name: 'thermometer', component: Thermometer, category: 'hidraulica', description: 'Termômetro' },
   { name: 'wind', component: Wind, category: 'hidraulica', description: 'Ventilação' },
   { name: 'gauge', component: Gauge, category: 'hidraulica', description: 'Medidor' },
@@ -81,24 +94,24 @@ export const systemIcons = [
   { name: 'eye', component: Eye, category: 'seguranca', description: 'Vigilância' },
 
   // === LIMPEZA E MANUTENÇÃO ===
-  { name: 'brush-cleaning', component: BrushCleaning, category: 'limpeza', description: 'Limpeza com escova' },
+  { name: 'brush-cleaning', component: Trash2, category: 'limpeza', description: 'Limpeza com escova' },
   { name: 'trash', component: Trash2, category: 'limpeza', description: 'Lixeira' },
   { name: 'recycle', component: Recycle, category: 'limpeza', description: 'Reciclagem' },
-  { name: 'washing-machine', component: WashingMachine, category: 'limpeza', description: 'Máquina de lavar' },
+  { name: 'washing-machine', component: Settings, category: 'limpeza', description: 'Máquina de lavar' },
 
   // === EQUIPAMENTOS MÉDICOS ===
   { name: 'heart', component: Heart, category: 'medico', description: 'Cardíaco' },
   { name: 'stethoscope', component: Stethoscope, category: 'medico', description: 'Estetoscópio' },
   { name: 'pill', component: Pill, category: 'medico', description: 'Medicamento' },
-  { name: 'cross', component: Cross, category: 'medico', description: 'Cruz médica' },
+  { name: 'cross', component: Plus, category: 'medico', description: 'Cruz médica' },
   { name: 'bandage', component: Bandage, category: 'medico', description: 'Curativo' },
   { name: 'syringe', component: Syringe, category: 'medico', description: 'Seringa' },
 
   // === EQUIPAMENTOS DOMÉSTICOS ===
   { name: 'lightbulb', component: Lightbulb, category: 'domestico', description: 'Lâmpada' },
   { name: 'fan', component: Fan, category: 'domestico', description: 'Ventilador' },
-  { name: 'air-vent', component: AirVent, category: 'domestico', description: 'Ar condicionado' },
-  { name: 'heater', component: Heater, category: 'domestico', description: 'Aquecedor' },
+  { name: 'air-vent', component: Fan, category: 'domestico', description: 'Ar condicionado' },
+  { name: 'heater', component: Thermometer, category: 'domestico', description: 'Aquecedor' },
   { name: 'refrigerator', component: Refrigerator, category: 'domestico', description: 'Geladeira' },
   { name: 'microwave', component: Microwave, category: 'domestico', description: 'Microondas' },
 
@@ -106,7 +119,7 @@ export const systemIcons = [
   { name: 'wifi', component: Wifi, category: 'conectividade', description: 'Wi-Fi' },
   { name: 'bluetooth', component: Bluetooth, category: 'conectividade', description: 'Bluetooth' },
   { name: 'radio', component: Radio, category: 'conectividade', description: 'Rádio' },
-  { name: 'antenna', component: Antenna, category: 'conectividade', description: 'Antena' },
+  { name: 'antenna', component: Radio, category: 'conectividade', description: 'Antena' },
   { name: 'router', component: Router, category: 'conectividade', description: 'Roteador' },
 
   // === GERAL ===

@@ -17,12 +17,14 @@
         <router-link v-if="authStore.hasRole('tecnico')" to="/preventiva" class="nav-link">Preventiva</router-link>
         <router-link v-if="authStore.hasRole('tecnico')" to="/estoque" class="nav-link">Estoque</router-link>
         <router-link v-if="authStore.hasRole('tecnico')" to="/workflows" class="nav-link">Workflows</router-link>
+        <router-link to="/reports" class="nav-link">Relatórios</router-link>
+        <router-link to="/help" class="nav-link">Ajuda</router-link>
         <router-link v-if="authStore.hasRole('supervisor')" to="/users" class="nav-link">Usuários</router-link>
         <router-link to="/departments" class="nav-link">Departamentos</router-link>
         <router-link v-if="authStore.hasRole('supervisor')" to="/permissions" class="nav-link">Permissões</router-link>
         <router-link to="/profile" class="nav-link">Perfil</router-link>
         <button @click="handleLogout" class="nav-button logout-button">
-          <i class="fas fa-sign-out-alt"></i>
+          <Icon name="logout" size="16" />
           Sair
         </button>
       </div>
@@ -36,9 +38,15 @@
     <!-- Conteúdo principal -->
     <main :class="{ 'with-navbar': authStore.isAuthenticated }">
       <router-view />
+      
+      <!-- Botão de ajuda flutuante (apenas quando autenticado e não na página de ajuda) -->
+      <HelpButton 
+        v-if="authStore.isAuthenticated && !isHelpPage" 
+        position="fixed"
+      />
     </main>
-
-    <!-- Notificações Toast -->
+    
+    <!-- Toast Notifications -->
     <div class="toast-container">
       <Toast
         v-for="toast in toasts"
@@ -54,14 +62,21 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useToast } from '@/composables/useToast'
 import Toast from '@/components/Toast.vue'
+import Icon from '@/components/Icon.vue'
+import HelpButton from '@/components/help/HelpButton.vue'
 
 const authStore = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 const { toasts, removeToast } = useToast()
+
+// Computed
+const isHelpPage = computed(() => route.path === '/help')
 
 const getRoleLabel = (role) => {
   const labels = {

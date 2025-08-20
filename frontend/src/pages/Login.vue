@@ -24,13 +24,13 @@
           
           <!-- Alerta de sucesso -->
           <div v-if="successMessage" class="alert alert-success">
-            <i class="fas fa-check-circle"></i>
+            <Icon name="success" size="16" class="alert-icon" />
             {{ successMessage }}
           </div>
           
           <!-- Alerta de erro -->
           <div v-if="error" class="alert alert-error">
-            <i class="fas fa-exclamation-circle"></i>
+            <Icon name="warning" size="16" class="alert-icon" />
             {{ error }}
           </div>
           
@@ -113,9 +113,13 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import Icon from '@/components/Icon.vue'
 
 export default {
   name: 'Login',
+  components: {
+    Icon
+  },
   setup() {
     const router = useRouter()
     const route = useRoute()

@@ -9,6 +9,12 @@ const { sequelize } = require('./models');
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./config/logger');
+const { 
+  performanceMiddleware, 
+  accessLogMiddleware, 
+  errorCaptureMiddleware, 
+  memoryMonitorMiddleware 
+} = require('./middleware/performance');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,10 +22,18 @@ const PORT = process.env.PORT || 3000;
 // Middlewares de segurança
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3002',
+  origin: [
+    'http://localhost:3002',
+    'http://localhost:3003'
+  ],
   credentials: true
 }));
 app.use(compression());
+
+// Middlewares de performance e monitoramento
+app.use(memoryMonitorMiddleware);
+app.use(performanceMiddleware);
+app.use(accessLogMiddleware);
 
 // Rate limiting
 const limiter = rateLimit({
@@ -37,6 +51,9 @@ app.use('/uploads', express.static('uploads'));
 
 // Rotas da API
 app.use('/api', routes);
+
+// Middleware de captura de erros (antes do errorHandler)
+app.use(errorCaptureMiddleware);
 
 // Middleware de tratamento de erros
 app.use(errorHandler);

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste Vue Básico</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body>
+    <div id="app">
+        <h1>{{ message }}</h1>
+        <button @click="changeMessage">Clique aqui</button>
+    </div>
+
+    <script>
+        const { createApp, ref } = Vue
+        
+        createApp({
+            setup() {
+                const message = ref('Vue está funcionando!')
+                
+                const changeMessage = () => {
+                    message.value = 'Botão clicado!'
+                }
+                
+                return {
+                    message,
+                    changeMessage
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>

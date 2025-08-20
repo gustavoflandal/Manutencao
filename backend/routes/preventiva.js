@@ -19,6 +19,12 @@ router.get('/stats',
   PlanoPreventivosController.stats
 );
 
+// Obter dados para gráfico de Gantt
+router.get('/gantt', 
+  requireRole('tecnico'),
+  PlanoPreventivosController.gantt
+);
+
 // Obter calendário de manutenções
 router.get('/calendario', 
   requireRole('tecnico'),

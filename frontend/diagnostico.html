@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Diagnóstico</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Diagnóstico do Sistema</h1>
+    
+    <div id="results">
+        <div class="status info">Carregando testes...</div>
+    </div>
+
+    <script>
+        const results = document.getElementById('results');
+        
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.innerHTML = message;
+            results.appendChild(div);
+        }
+        
+        async function runDiagnostics() {
+            results.innerHTML = '<h2>🧪 Executando Diagnósticos...</h2>';
+            
+            // Teste 1: Backend
+            try {
+                const backendResponse = await fetch('http://localhost:3001/api');
+                if (backendResponse.ok) {
+                    addResult('✅ Backend: Conectado (Porta 3001)', 'success');
+                } else {
+                    addResult('❌ Backend: Erro na resposta', 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Backend: Falha na conexão - ${error.message}`, 'error');
+            }
+            
+            // Teste 2: Verificar se Vue está disponível
+            if (typeof Vue !== 'undefined') {
+                addResult('✅ Vue.js: Biblioteca carregada', 'success');
+            } else {
+                addResult('❌ Vue.js: Biblioteca não encontrada', 'error');
+            }
+            
+            // Teste 3: Verificar localStorage
+            try {
+                localStorage.setItem('test', 'ok');
+                localStorage.removeItem('test');
+                addResult('✅ LocalStorage: Funcionando', 'success');
+            } catch (error) {
+                addResult(`❌ LocalStorage: Erro - ${error.message}`, 'error');
+            }
+            
+            // Teste 4: Verificar se a aplicação Vue montou
+            setTimeout(() => {
+                const appElement = document.querySelector('[data-v-app]') || document.querySelector('#app');
+                if (appElement && appElement.innerHTML.trim() !== '') {
+                    addResult('✅ Aplicação Vue: Montada com sucesso', 'success');
+                } else {
+                    addResult('❌ Aplicação Vue: Não montada ou vazia', 'error');
+                    addResult('💡 Dica: Verifique console do navegador para erros JavaScript', 'info');
+                }
+            }, 2000);
+            
+            // Teste 5: Verificar rotas
+            addResult('🔗 Testando rotas principais:', 'info');
+            const routes = ['/login', '/dashboard', '/help'];
+            
+            for (const route of routes) {
+                try {
+                    const response = await fetch(`http://localhost:3003${route}`);
+                    if (response.ok) {
+                        addResult(`  ✅ Rota ${route}: Acessível`, 'success');
+                    } else {
+                        addResult(`  ⚠️ Rota ${route}: Status ${response.status}`, 'error');
+                    }
+                } catch (error) {
+                    addResult(`  ❌ Rota ${route}: Erro - ${error.message}`, 'error');
+                }
+            }
+        }
+        
+        // Executar diagnósticos
+        runDiagnostics();
+        
+        // Logs adicionais
+        console.log('🔍 Diagnóstico iniciado');
+        console.log('Current URL:', window.location.href);
+        console.log('User Agent:', navigator.userAgent);
+    </script>
+</body>
+</html>

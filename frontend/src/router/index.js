@@ -25,6 +25,8 @@ import Estoque from '@/pages/Estoque.vue'
 import Workflows from '@/pages/Workflows.vue'
 import WorkflowTemplates from '@/pages/WorkflowTemplates.vue'
 import WorkflowDetail from '@/pages/WorkflowDetail.vue'
+import Reports from '@/pages/Reports.vue'
+import Help from '@/pages/Help.vue'
 
 const routes = [
   {
@@ -184,7 +186,7 @@ const routes = [
     component: () => import('@/pages/WorkflowInstances.vue'),
     meta: { 
       requiresAuth: true,
-      requiredRole: 'tecnico'
+      requiresRole: 'tecnico'
     }
   },
   {
@@ -193,36 +195,48 @@ const routes = [
     component: () => import('@/pages/WorkflowDetail.vue'),
     meta: { 
       requiresAuth: true,
-      requiredRole: 'tecnico'
+      requiresRole: 'tecnico'
     }
   },
   {
-      path: '/workflows/create',
-      name: 'WorkflowCreate',
-      component: () => import('@/pages/WorkflowForm.vue'),
-      meta: { 
-        requiresAuth: true,
-        requiredRole: 'tecnico'
-      }
-    },
-    {
-      path: '/workflows/:id/edit',
-      name: 'WorkflowEdit',
-      component: () => import('@/pages/WorkflowForm.vue'),
-      meta: { 
-        requiresAuth: true,
-        requiredRole: 'tecnico'
-      }
-    },
-    {
-      path: '/workflows/:id',
-      name: 'WorkflowDetail',
-      component: () => import('@/pages/WorkflowDetail.vue'),
-      meta: { 
-        requiresAuth: true,
-        requiredRole: 'tecnico'
-      }
-    },
+    path: '/workflows/create',
+    name: 'WorkflowCreate',
+    component: () => import('@/pages/WorkflowForm.vue'),
+    meta: { 
+      requiresAuth: true,
+      requiresRole: 'tecnico'
+    }
+  },
+  {
+    path: '/workflows/:id/edit',
+    name: 'WorkflowEdit',
+    component: () => import('@/pages/WorkflowForm.vue'),
+    meta: { 
+      requiresAuth: true,
+      requiresRole: 'tecnico'
+    }
+  },
+  {
+    path: '/workflows/:id',
+    name: 'WorkflowDetail',
+    component: () => import('@/pages/WorkflowDetail.vue'),
+    meta: { 
+      requiresAuth: true,
+      requiresRole: 'tecnico'
+    }
+  },
+  {
+    path: '/reports',
+    name: 'Reports',
+    component: Reports,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/help',
+    name: 'Help',
+    component: Help,
+    meta: { requiresAuth: true }
+  },
   {
     path: '/profile',
     name: 'Profile',

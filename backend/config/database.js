@@ -18,8 +18,20 @@ const sequelize = new Sequelize({
     acquire: 60000,
   },
   logging: (sql) => {
-    if (process.env.NODE_ENV === 'development') {
+    // Apenas logs críticos em produção
+    if (process.env.NODE_ENV === 'development' && process.env.DB_DEBUG === 'true') {
       logger.debug(sql);
+    }
+    // Em produção, logar apenas queries que demoram muito
+    else if (process.env.NODE_ENV === 'production') {
+      // Medir tempo da query e logar apenas se demorar muito
+      const start = Date.now();
+      return () => {
+        const duration = Date.now() - start;
+        if (duration > 1000) { // Queries que demoram mais de 1 segundo
+          logger.warn(`Slow query detected (${duration}ms): ${sql.substring(0, 100)}...`);
+        }
+      };
     }
   },
   define: {

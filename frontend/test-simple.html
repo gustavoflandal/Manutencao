@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teste Frontend</title>
+</head>
+<body>
+  <div id="app">
+    <h1>Teste de Frontend</h1>
+    <p>Se você está vendo esta mensagem, o servidor está funcionando.</p>
+  </div>
+  
+  <script type="module">
+    import { createApp } from 'vue'
+    
+    const { createApp: app } = Vue
+    
+    createApp({
+      data() {
+        return {
+          message: 'Vue funcionando!'
+        }
+      },
+      template: `
+        <div>
+          <h1>{{ message }}</h1>
+          <p>Teste de Vue.js</p>
+        </div>
+      `
+    }).mount('#app')
+  </script>
+  
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</body>
+</html>

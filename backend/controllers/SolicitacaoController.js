@@ -1,14 +1,14 @@
 const { Solicitacao, User, Department, Category, SubCategory } = require('../models');
 const { Op } = require('sequelize');
 const logger = require('../config/logger');
+const { QueryOptimizer, TransactionHelper } = require('../utils/QueryOptimizer');
+const { logBusinessOperation } = require('../middleware/performance');
 
 class SolicitacaoController {
   // Listar solicitações com paginação e filtros
   async index(req, res, next) {
     try {
       const { 
-        page = 1, 
-        limit = 10, 
         search = '', 
         status = '', 
         categoria = '',
@@ -19,95 +19,92 @@ class SolicitacaoController {
         orderDirection = 'DESC'
       } = req.query;
 
-      const offset = (parseInt(page) - 1) * parseInt(limit);
+      // Usar otimizador para paginação
+      const pagination = QueryOptimizer.getPaginationOptions(
+        req.query.page, 
+        req.query.limit, 
+        50 // máximo 50 por página
+      );
       
-      // Construir filtros
+      // Construir filtros otimizados
       const whereClause = {};
       
       if (search) {
-        whereClause[Op.or] = [
-          { numero: { [Op.like]: `%${search}%` } },
-          { titulo: { [Op.like]: `%${search}%` } },
-          { descricao: { [Op.like]: `%${search}%` } },
-          { localizacao: { [Op.like]: `%${search}%` } }
-        ];
+        Object.assign(whereClause, QueryOptimizer.buildSearchFilter(search, [
+          'numero', 'titulo', 'descricao', 'localizacao'
+        ]));
       }
       
-      if (status) {
-        whereClause.status = status;
-      }
-      
-      if (categoria) {
-        whereClause.categoria = categoria;
-      }
-      
-      if (prioridade) {
-        whereClause.prioridade = prioridade;
-      }
-      
-      if (solicitante_id) {
-        whereClause.solicitante_id = solicitante_id;
-      }
-      
-      if (responsavel_id) {
-        whereClause.responsavel_id = responsavel_id;
-      }
+      if (status) whereClause.status = status;
+      if (categoria) whereClause.categoria = categoria;
+      if (prioridade) whereClause.prioridade = prioridade;
+      if (solicitante_id) whereClause.solicitante_id = solicitante_id;
+      if (responsavel_id) whereClause.responsavel_id = responsavel_id;
 
       // Verificar permissões - solicitantes só veem suas próprias solicitações
       if (req.user.perfil === 'solicitante') {
         whereClause.solicitante_id = req.user.id;
       }
 
-      // Buscar solicitações
-      const { count, rows: solicitacoes } = await Solicitacao.findAndCountAll({
-        where: whereClause,
-        include: [
-          {
-            model: User,
-            as: 'solicitante',
-            attributes: ['id', 'nome', 'email']
-          },
-          {
-            model: User,
-            as: 'responsavel',
-            attributes: ['id', 'nome', 'email'],
-            required: false
-          },
-          {
-            model: Department,
-            as: 'department',
-            attributes: ['id', 'nome'],
-            required: false
-          },
-          {
-            model: Category,
-            as: 'categoriaObj',
-            attributes: ['id', 'nome', 'cor', 'icone'],
-            required: false
-          },
-          {
-            model: SubCategory,
-            as: 'subcategoriaObj',
-            attributes: ['id', 'nome'],
-            required: false
-          }
-        ],
-        order: [[orderBy, orderDirection.toUpperCase()]],
-        limit: parseInt(limit),
-        offset: offset
-      });
+      // Includes otimizados
+      const includes = QueryOptimizer.optimizeIncludes([
+        {
+          model: User,
+          as: 'solicitante',
+          attributes: ['id', 'nome', 'email']
+        },
+        {
+          model: User,
+          as: 'responsavel',
+          attributes: ['id', 'nome', 'email']
+        },
+        {
+          model: Department,
+          as: 'department',
+          attributes: ['id', 'nome']
+        },
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'nome']
+        },
+        {
+          model: SubCategory,
+          as: 'subcategory',
+          attributes: ['id', 'nome']
+        }
+      ]);
 
-      const totalPages = Math.ceil(count / parseInt(limit));
+      // Ordenação segura
+      const validOrderFields = ['created_at', 'updated_at', 'numero', 'titulo', 'status', 'prioridade'];
+      const order = QueryOptimizer.buildSafeOrder(orderBy, orderDirection, validOrderFields);
+
+      // Buscar solicitações com cache para consultas repetidas
+      const cacheKey = `solicitacoes_${JSON.stringify({ whereClause, pagination, orderBy, orderDirection })}`;
+      
+      const { count, rows: solicitacoes } = await QueryOptimizer.getCached(
+        cacheKey,
+        () => Solicitacao.findAndCountAll({
+          where: whereClause,
+          include: includes,
+          limit: pagination.limit,
+          offset: pagination.offset,
+          order,
+          distinct: true // Evitar contagem duplicada com joins
+        })
+      );
+
+      const totalPages = Math.ceil(count / pagination.limit);
 
       res.json({
         success: true,
         data: {
           solicitacoes,
           pagination: {
-            currentPage: parseInt(page),
+            currentPage: pagination.page,
             totalPages,
             totalItems: count,
-            itemsPerPage: parseInt(limit)
+            itemsPerPage: pagination.limit
           }
         }
       });
@@ -144,13 +141,13 @@ class SolicitacaoController {
           },
           {
             model: Category,
-            as: 'categoriaObj',
+            as: 'category',
             attributes: ['id', 'nome', 'cor', 'icone'],
             required: false
           },
           {
             model: SubCategory,
-            as: 'subcategoriaObj',
+            as: 'subcategory',
             attributes: ['id', 'nome'],
             required: false
           }
@@ -226,60 +223,73 @@ class SolicitacaoController {
         }
       }
 
-      // Criar solicitação
-      const solicitacaoData = {
-        titulo: titulo.trim(),
-        descricao: descricao.trim(),
-        categoria,
-        subcategoria: subcategoria?.trim(),
-        prioridade: prioridade || 'normal',
-        localizacao: localizacao.trim(),
-        observacoes: observacoes?.trim(),
-        data_prevista: data_prevista || null,
-        department_id: department_id || null,
-        solicitante_id: req.user.id
-      };
+      // Executar criação em transação otimizada
+      const result = await TransactionHelper.executeInTransaction(async (transaction) => {
+        // Criar solicitação
+        const solicitacaoData = {
+          titulo: titulo.trim(),
+          descricao: descricao.trim(),
+          categoria,
+          subcategoria: subcategoria?.trim(),
+          prioridade: prioridade || 'normal',
+          localizacao: localizacao.trim(),
+          observacoes: observacoes?.trim(),
+          data_prevista: data_prevista || null,
+          department_id: department_id || null,
+          solicitante_id: req.user.id
+        };
 
-      const solicitacao = await Solicitacao.create(solicitacaoData);
+        const solicitacao = await Solicitacao.create(solicitacaoData, { transaction });
 
-      // Recarregar com associações
-      const solicitacaoCompleta = await Solicitacao.findByPk(solicitacao.id, {
-        include: [
-          {
-            model: User,
-            as: 'solicitante',
-            attributes: ['id', 'nome', 'email']
-          },
-          {
-            model: Department,
-            as: 'department',
-            attributes: ['id', 'nome'],
-            required: false
-          },
-          {
-            model: Category,
-            as: 'categoriaObj',
-            attributes: ['id', 'nome', 'cor', 'icone'],
-            required: false
-          },
-          {
-            model: SubCategory,
-            as: 'subcategoriaObj',
-            attributes: ['id', 'nome'],
-            required: false
-          }
-        ]
+        // Recarregar com associações
+        const solicitacaoCompleta = await Solicitacao.findByPk(solicitacao.id, {
+          include: QueryOptimizer.optimizeIncludes([
+            {
+              model: User,
+              as: 'solicitante',
+              attributes: ['id', 'nome', 'email']
+            },
+            {
+              model: Department,
+              as: 'department',
+              attributes: ['id', 'nome']
+            },
+            {
+              model: Category,
+              as: 'category',
+              attributes: ['id', 'nome', 'cor', 'icone']
+            },
+            {
+              model: SubCategory,
+              as: 'subcategory',
+              attributes: ['id', 'nome']
+            }
+          ]),
+          transaction
+        });
+
+        return solicitacaoCompleta;
       });
 
-      logger.info(`Solicitação criada: ${solicitacao.numero}`, {
-        solicitacaoId: solicitacao.id,
-        solicitanteId: req.user.id
-      });
+      // Log de operação de negócio
+      logBusinessOperation(
+        'solicitacao_created',
+        req.user.id,
+        {
+          solicitacao_id: result.id,
+          categoria,
+          prioridade: prioridade || 'normal',
+          titulo: titulo.substring(0, 50) // Limitar tamanho do título no log
+        }
+      );
+
+      // Limpar cache relacionado
+      QueryOptimizer.clearCache('solicitacoes_');
 
       res.status(201).json({
         success: true,
         message: 'Solicitação criada com sucesso',
-        data: { solicitacao: solicitacaoCompleta }
+        data: { solicitacao: result }
       });
 
     } catch (error) {
@@ -380,13 +390,13 @@ class SolicitacaoController {
           },
           {
             model: Category,
-            as: 'categoriaObj',
+            as: 'category',
             attributes: ['id', 'nome', 'cor', 'icone'],
             required: false
           },
           {
             model: SubCategory,
-            as: 'subcategoriaObj',
+            as: 'subcategory',
             attributes: ['id', 'nome'],
             required: false
           }

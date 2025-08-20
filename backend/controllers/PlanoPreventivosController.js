@@ -1292,6 +1292,164 @@ class PlanoPreventivosController {
       });
     }
   }
+
+  // Obter dados para gráfico de Gantt
+  async gantt(req, res) {
+    try {
+      const { 
+        periodo = 90,
+        apenas_ativos = 'true',
+        incluir_concluidos = 'false'
+      } = req.query;
+
+      const hoje = new Date();
+      const dataFim = new Date();
+      dataFim.setDate(hoje.getDate() + parseInt(periodo));
+
+      const where = {};
+
+      // Filtrar apenas ativos se solicitado
+      if (apenas_ativos === 'true') {
+        where.ativo = true;
+      }
+
+      // Calcular próxima execução e status
+      const planos = await PlanoPreventivo.findAll({
+        where,
+        include: [
+          {
+            model: Ativo,
+            as: 'ativo',
+            attributes: ['id', 'nome', 'codigo']
+          },
+          {
+            model: User,
+            as: 'responsavel',
+            attributes: ['id', 'nome', 'email']
+          },
+          {
+            model: OrdemServico,
+            as: 'ordens',
+            attributes: ['id', 'data_conclusao'],
+            where: { status: 'concluida' },
+            required: false,
+            limit: 1,
+            order: [['data_conclusao', 'DESC']]
+          }
+        ],
+        order: [['proxima_execucao', 'ASC']]
+      });
+
+      // Processar e filtrar planos por período
+      const dadosGantt = [];
+
+      for (const plano of planos) {
+        const proximaExecucao = new Date(plano.proxima_execucao);
+        
+        // Filtrar por período se dentro do range
+        if (proximaExecucao <= dataFim) {
+          const ultimaOrdem = plano.ordens && plano.ordens.length > 0 ? plano.ordens[0] : null;
+          const ultimaExecucao = ultimaOrdem ? ultimaOrdem.data_conclusao : plano.created_at;
+          
+          // Calcular status baseado na data
+          let status = 'ativo';
+          const diasAteVencimento = Math.ceil((proximaExecucao - hoje) / (1000 * 60 * 60 * 24));
+          
+          if (diasAteVencimento < 0) {
+            status = 'vencido';
+          } else if (diasAteVencimento <= 7) {
+            status = 'proximo_vencimento';
+          } else if (plano.em_execucao) {
+            status = 'em_execucao';
+          } else if (!plano.ativo) {
+            status = 'pausado';
+          }
+
+          // Incluir concluídos se solicitado
+          if (incluir_concluidos === 'false' && status === 'concluido') {
+            continue;
+          }
+
+          // Mapear frequência para texto legível
+          const frequenciaTexto = {
+            'diaria': 'Diária',
+            'semanal': 'Semanal', 
+            'quinzenal': 'Quinzenal',
+            'mensal': 'Mensal',
+            'bimestral': 'Bimestral',
+            'trimestral': 'Trimestral',
+            'semestral': 'Semestral',
+            'anual': 'Anual'
+          };
+
+          dadosGantt.push({
+            id: plano.id,
+            nome: plano.nome,
+            codigo: plano.codigo,
+            descricao: plano.descricao,
+            categoria: plano.categoria,
+            prioridade: plano.prioridade,
+            frequencia: plano.frequencia,
+            frequencia_texto: frequenciaTexto[plano.frequencia] || plano.frequencia,
+            proxima_execucao: plano.proxima_execucao,
+            ultima_execucao: ultimaExecucao,
+            status: status,
+            dias_ate_vencimento: diasAteVencimento,
+            ativo: plano.ativo,
+            responsavel: plano.responsavel,
+            estimativa_duracao: plano.estimativa_duracao || this.calcularDuracaoEstimada(plano.frequencia),
+            criado_em: plano.created_at,
+            atualizado_em: plano.updated_at
+          });
+        }
+      }
+
+      // Estatísticas resumidas
+      const estatisticas = {
+        total: dadosGantt.length,
+        vencidos: dadosGantt.filter(p => p.status === 'vencido').length,
+        proximo_vencimento: dadosGantt.filter(p => p.status === 'proximo_vencimento').length,
+        em_execucao: dadosGantt.filter(p => p.status === 'em_execucao').length,
+        ativos: dadosGantt.filter(p => p.status === 'ativo').length,
+        periodo_dias: parseInt(periodo)
+      };
+
+      res.json({
+        success: true,
+        dados: dadosGantt,
+        estatisticas: estatisticas,
+        filtros: {
+          periodo: parseInt(periodo),
+          apenas_ativos: apenas_ativos === 'true',
+          incluir_concluidos: incluir_concluidos === 'true',
+          data_inicio: hoje.toISOString(),
+          data_fim: dataFim.toISOString()
+        }
+      });
+
+    } catch (error) {
+      logger.error('Erro ao obter dados do Gantt:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro interno do servidor'
+      });
+    }
+  }
+
+  // Método auxiliar para calcular duração estimada
+  calcularDuracaoEstimada(frequencia) {
+    const duracoes = {
+      'diaria': 2,
+      'semanal': 4,
+      'quinzenal': 6,
+      'mensal': 8,
+      'bimestral': 12,
+      'trimestral': 16,
+      'semestral': 24,
+      'anual': 48
+    };
+    return duracoes[frequencia] || 4;
+  }
 }
 
 module.exports = new PlanoPreventivosController();

@@ -7,6 +7,10 @@
           <i class="fas fa-chart-bar"></i>
           Relatórios
         </button>
+        <button class="btn btn-success" @click="abrirGantt">
+          <i class="fas fa-chart-gantt"></i>
+          Gráfico de Gantt
+        </button>
         <button class="btn btn-warning" @click="gerarOrdensAutomaticas">
           <i class="fas fa-magic"></i>
           Gerar Ordens
@@ -559,6 +563,171 @@
         </div>
       </div>
     </div>
+
+    <!-- Modal do Gráfico de Gantt -->
+    <div v-if="mostrarGantt" class="modal-overlay" @click="fecharGantt">
+      <div class="modal-content extra-large-modal" @click.stop>
+        <div class="modal-header">
+          <h3><i class="fas fa-chart-gantt"></i> Cronograma de Manutenção Preventiva</h3>
+          <button class="btn-close" @click="fecharGantt">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <div class="modal-body">
+          <!-- Filtros do Gantt -->
+          <div class="gantt-filtros">
+            <div class="filter-group">
+              <label>Período (dias):</label>
+              <select v-model="ganttFiltros.periodo" @change="carregarDadosGantt">
+                <option value="30">Próximos 30 dias</option>
+                <option value="60">Próximos 60 dias</option>
+                <option value="90">Próximos 90 dias</option>
+                <option value="180">Próximos 6 meses</option>
+                <option value="365">Próximo ano</option>
+              </select>
+            </div>
+            
+            <div class="filter-group">
+              <label class="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  v-model="ganttFiltros.apenas_ativos" 
+                  @change="carregarDadosGantt"
+                />
+                Apenas planos ativos
+              </label>
+            </div>
+            
+            <div class="filter-group">
+              <label class="checkbox-label">
+                <input 
+                  type="checkbox" 
+                  v-model="ganttFiltros.incluir_concluidos" 
+                  @change="carregarDadosGantt"
+                />
+                Incluir concluídos
+              </label>
+            </div>
+            
+            <button class="btn btn-primary" @click="carregarDadosGantt">
+              <i class="fas fa-sync-alt"></i>
+              Atualizar
+            </button>
+          </div>
+          
+          <!-- Loading do Gantt -->
+          <div v-if="loadingGantt" class="loading-state">
+            <div class="spinner"></div>
+            <p>Carregando cronograma...</p>
+          </div>
+          
+          <!-- Gráfico de Gantt -->
+          <div v-else-if="dadosGantt.length > 0" class="gantt-container">
+            <div class="gantt-header">
+              <div class="gantt-legend">
+                <div class="legend-item">
+                  <div class="legend-color" style="background: #4CAF50;"></div>
+                  <span>Ativo</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color" style="background: #F44336;"></div>
+                  <span>Vencido</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color" style="background: #FF9800;"></div>
+                  <span>Próximo ao vencimento</span>
+                </div>
+                <div class="legend-item">
+                  <div class="legend-color" style="background: #2196F3;"></div>
+                  <span>Em execução</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="gantt-chart">
+              <!-- Timeline do Gantt -->
+              <div class="gantt-timeline">
+                <div class="timeline-header">
+                  <div class="task-column">Plano de Manutenção</div>
+                  <div class="chart-column">
+                    <div class="timeline-dates">
+                      <div 
+                        v-for="(date, index) in gerarTimelineDatas()" 
+                        :key="index"
+                        class="timeline-date"
+                      >
+                        {{ formatarDataTimeline(date) }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- Linhas das tarefas -->
+                <div class="gantt-tasks">
+                  <div 
+                    v-for="task in dadosGantt" 
+                    :key="task.id"
+                    class="gantt-task-row"
+                  >
+                    <div class="task-info">
+                      <div class="task-name">{{ task.name }}</div>
+                      <div class="task-details">
+                        <span class="task-asset">{{ task.custom.ativo }}</span>
+                        <span class="task-frequency">{{ task.custom.frequencia }}</span>
+                      </div>
+                    </div>
+                    
+                    <div class="task-chart">
+                      <div 
+                        class="task-bar"
+                        :style="{
+                          left: calcularPosicaoInicio(task.start) + '%',
+                          width: calcularLarguraBarra(task.start, task.end) + '%',
+                          backgroundColor: task.styles.backgroundColor
+                        }"
+                        :title="`${task.name} - ${formatarDataCompleta(task.start)} até ${formatarDataCompleta(task.end)}`"
+                      >
+                        <div 
+                          class="task-progress"
+                          :style="{
+                            width: task.progress + '%',
+                            backgroundColor: task.styles.progressColor
+                          }"
+                        ></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Informações adicionais -->
+            <div class="gantt-summary">
+              <div class="summary-item">
+                <strong>Total de planos:</strong> {{ dadosGantt.length }}
+              </div>
+              <div class="summary-item">
+                <strong>Vencidos:</strong> {{ contarPorStatus('vencido') }}
+              </div>
+              <div class="summary-item">
+                <strong>Próximos ao vencimento:</strong> {{ contarPorStatus('proximo_vencimento') }}
+              </div>
+              <div class="summary-item">
+                <strong>Em execução:</strong> {{ contarPorStatus('em_execucao') }}
+              </div>
+            </div>
+          </div>
+          
+          <!-- Estado vazio -->
+          <div v-else class="empty-state">
+            <i class="fas fa-calendar-times"></i>
+            <h3>Nenhum plano encontrado</h3>
+            <p>Não há planos de manutenção no período selecionado.</p>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -586,11 +755,21 @@ export default {
     const mostrarGeracaoOrdens = ref(false)
     const mostrarSugestoes = ref(false)
     const mostrarRelatorios = ref(false)
+    const mostrarGantt = ref(false)
     const planoEdicao = ref(null)
     const planoExecucao = ref(null)
     const sugestoes = ref([])
     const sugestoesPorPrioridade = ref({})
     const relatorioEficiencia = ref(null)
+    
+    // Dados do Gantt
+    const dadosGantt = ref([])
+    const loadingGantt = ref(false)
+    const ganttFiltros = reactive({
+      periodo: 90, // próximos 90 dias
+      apenas_ativos: true,
+      incluir_concluidos: false
+    })
     
     // Calendário
     const mesAtual = ref(new Date().getMonth())
@@ -697,6 +876,112 @@ export default {
       searchTimeout = setTimeout(() => {
         carregarPlanos()
       }, 500)
+    }
+
+    // Carregar dados para o Gráfico de Gantt
+    const carregarDadosGantt = async () => {
+      try {
+        loadingGantt.value = true
+        
+        const params = {
+          periodo: ganttFiltros.periodo,
+          apenas_ativos: ganttFiltros.apenas_ativos,
+          incluir_concluidos: ganttFiltros.incluir_concluidos
+        }
+        
+        const response = await api.get('/preventiva/gantt', { params })
+        
+        if (response.data.success) {
+          dadosGantt.value = processarDadosGantt(response.data.dados)
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados do Gantt:', error)
+        toast.add({
+          type: 'error',
+          title: 'Erro',
+          message: 'Erro ao carregar dados do gráfico de Gantt',
+          duration: 3000
+        })
+      } finally {
+        loadingGantt.value = false
+      }
+    }
+
+    // Processar dados para formato do Gantt
+    const processarDadosGantt = (dados) => {
+      return dados.map(plano => {
+        const inicioProximaExecucao = new Date(plano.proxima_execucao)
+        const fimExecucao = new Date(inicioProximaExecucao)
+        
+        // Estimar duração baseada na frequência
+        const duracaoEstimada = calcularDuracaoEstimada(plano.frequencia)
+        fimExecucao.setHours(fimExecucao.getHours() + duracaoEstimada)
+        
+        return {
+          id: plano.id,
+          name: plano.nome,
+          start: inicioProximaExecucao,
+          end: fimExecucao,
+          progress: calcularProgressoPlano(plano),
+          dependencies: [],
+          type: 'task',
+          styles: {
+            backgroundColor: getCorStatusPlano(plano.status),
+            progressColor: '#4CAF50',
+            textColor: '#333'
+          },
+          custom: {
+            ativo: plano.ativo?.nome || 'N/A',
+            frequencia: plano.frequencia_texto,
+            status: plano.status,
+            prioridade: plano.prioridade,
+            responsavel: plano.responsavel?.nome || 'Não definido',
+            proximaExecucao: plano.proxima_execucao,
+            ultimaExecucao: plano.ultima_execucao
+          }
+        }
+      })
+    }
+
+    const calcularDuracaoEstimada = (frequencia) => {
+      const duracoes = {
+        'diaria': 2,
+        'semanal': 4,
+        'quinzenal': 6,
+        'mensal': 8,
+        'bimestral': 12,
+        'trimestral': 16,
+        'semestral': 24,
+        'anual': 48
+      }
+      return duracoes[frequencia] || 4
+    }
+
+    const calcularProgressoPlano = (plano) => {
+      if (!plano.ultima_execucao) return 0
+      
+      const ultimaExecucao = new Date(plano.ultima_execucao)
+      const proximaExecucao = new Date(plano.proxima_execucao)
+      const agora = new Date()
+      
+      if (agora >= proximaExecucao) return 0 // Vencido
+      
+      const totalTempo = proximaExecucao.getTime() - ultimaExecucao.getTime()
+      const tempoDecorrido = agora.getTime() - ultimaExecucao.getTime()
+      
+      return Math.max(0, Math.min(100, (tempoDecorrido / totalTempo) * 100))
+    }
+
+    const getCorStatusPlano = (status) => {
+      const cores = {
+        'ativo': '#4CAF50',
+        'vencido': '#F44336',
+        'proximo_vencimento': '#FF9800',
+        'em_execucao': '#2196F3',
+        'pausado': '#9E9E9E',
+        'concluido': '#8BC34A'
+      }
+      return cores[status] || '#9E9E9E'
     }
     
     const carregarPlanos = async (page = 1) => {
@@ -972,6 +1257,80 @@ export default {
       mostrarRelatorios.value = true
       carregarRelatorio()
     }
+
+    const abrirGantt = () => {
+      mostrarGantt.value = true
+      carregarDadosGantt()
+    }
+
+    const fecharGantt = () => {
+      mostrarGantt.value = false
+    }
+
+    // Métodos auxiliares do Gantt
+    const gerarTimelineDatas = () => {
+      const hoje = new Date()
+      const periodoFim = new Date()
+      periodoFim.setDate(hoje.getDate() + ganttFiltros.periodo)
+      
+      const datas = []
+      const incremento = ganttFiltros.periodo <= 30 ? 1 : ganttFiltros.periodo <= 90 ? 7 : 30
+      
+      for (let data = new Date(hoje); data <= periodoFim; data.setDate(data.getDate() + incremento)) {
+        datas.push(new Date(data))
+      }
+      
+      return datas
+    }
+
+    const formatarDataTimeline = (data) => {
+      const opcoes = ganttFiltros.periodo <= 30 
+        ? { day: '2-digit', month: '2-digit' }
+        : ganttFiltros.periodo <= 90
+        ? { day: '2-digit', month: 'short' }
+        : { month: 'short', year: '2-digit' }
+      
+      return data.toLocaleDateString('pt-BR', opcoes)
+    }
+
+    const formatarDataCompleta = (data) => {
+      return new Date(data).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    }
+
+    const calcularPosicaoInicio = (dataInicio) => {
+      const hoje = new Date()
+      const inicio = new Date(dataInicio)
+      const periodoFim = new Date()
+      periodoFim.setDate(hoje.getDate() + ganttFiltros.periodo)
+      
+      const totalTempo = periodoFim.getTime() - hoje.getTime()
+      const tempoAteInicio = inicio.getTime() - hoje.getTime()
+      
+      return Math.max(0, (tempoAteInicio / totalTempo) * 100)
+    }
+
+    const calcularLarguraBarra = (dataInicio, dataFim) => {
+      const hoje = new Date()
+      const inicio = new Date(dataInicio)
+      const fim = new Date(dataFim)
+      const periodoFim = new Date()
+      periodoFim.setDate(hoje.getDate() + ganttFiltros.periodo)
+      
+      const totalTempo = periodoFim.getTime() - hoje.getTime()
+      const duracaoTarefa = fim.getTime() - inicio.getTime()
+      
+      return Math.min(100, Math.max(1, (duracaoTarefa / totalTempo) * 100))
+    }
+
+    const contarPorStatus = (status) => {
+      return dadosGantt.value.filter(task => task.custom.status === status).length
+    }
     
     const fecharRelatorios = () => {
       mostrarRelatorios.value = false
@@ -1152,11 +1511,15 @@ export default {
       mostrarGeracaoOrdens,
       mostrarSugestoes,
       mostrarRelatorios,
+      mostrarGantt,
       planoEdicao,
       planoExecucao,
       sugestoes,
       sugestoesPorPrioridade,
       relatorioEficiencia,
+      dadosGantt,
+      loadingGantt,
+      ganttFiltros,
       mesAtual,
       anoAtual,
       paginacao,
@@ -1197,6 +1560,15 @@ export default {
       abrirRelatorios,
       fecharRelatorios,
       carregarRelatorio,
+      abrirGantt,
+      fecharGantt,
+      carregarDadosGantt,
+      gerarTimelineDatas,
+      formatarDataTimeline,
+      formatarDataCompleta,
+      calcularPosicaoInicio,
+      calcularLarguraBarra,
+      contarPorStatus,
       
       // Formatação
       formatarData,
@@ -1537,6 +1909,286 @@ export default {
 
 .large-modal {
   max-width: 1000px;
+}
+
+.extra-large-modal {
+  max-width: 1400px;
+  width: 95%;
+}
+
+/* Estilos do Gráfico de Gantt */
+.gantt-filtros {
+  display: flex;
+  gap: 1rem;
+  align-items: end;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.gantt-container {
+  width: 100%;
+  overflow: hidden;
+}
+
+.gantt-header {
+  margin-bottom: 1rem;
+}
+
+.gantt-legend {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.legend-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.gantt-chart {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+  background: white;
+}
+
+.gantt-timeline {
+  width: 100%;
+}
+
+.timeline-header {
+  display: flex;
+  background: #f8f9fa;
+  border-bottom: 2px solid #ddd;
+  font-weight: 600;
+}
+
+.task-column {
+  width: 300px;
+  min-width: 300px;
+  padding: 1rem;
+  border-right: 1px solid #ddd;
+  background: #f1f3f4;
+}
+
+.chart-column {
+  flex: 1;
+  overflow-x: auto;
+  min-width: 600px;
+}
+
+.timeline-dates {
+  display: flex;
+  min-width: 100%;
+}
+
+.timeline-date {
+  flex: 1;
+  padding: 0.75rem 0.5rem;
+  text-align: center;
+  border-right: 1px solid #eee;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.gantt-tasks {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.gantt-task-row {
+  display: flex;
+  border-bottom: 1px solid #eee;
+  min-height: 60px;
+}
+
+.gantt-task-row:nth-child(even) {
+  background: #fafafa;
+}
+
+.task-info {
+  width: 300px;
+  min-width: 300px;
+  padding: 0.75rem;
+  border-right: 1px solid #ddd;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.task-name {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.task-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.task-asset, .task-frequency {
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.task-chart {
+  flex: 1;
+  position: relative;
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0;
+  overflow-x: auto;
+  min-width: 600px;
+}
+
+.task-bar {
+  position: absolute;
+  height: 24px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+  min-width: 8px;
+}
+
+.task-bar:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.task-progress {
+  height: 100%;
+  border-radius: 12px;
+  transition: width 0.3s ease;
+  opacity: 0.7;
+}
+
+.gantt-summary {
+  display: flex;
+  gap: 2rem;
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.summary-item {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.summary-item strong {
+  color: #333;
+}
+
+/* Loading state */
+.loading-state {
+  text-align: center;
+  padding: 3rem;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #007bff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+}
+
+.empty-state i {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  color: #ccc;
+}
+
+.empty-state h3 {
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+/* Responsive do Gantt */
+@media (max-width: 1200px) {
+  .extra-large-modal {
+    width: 98%;
+    max-width: none;
+  }
+  
+  .task-column {
+    width: 250px;
+    min-width: 250px;
+  }
+  
+  .task-info {
+    width: 250px;
+    min-width: 250px;
+  }
+}
+
+@media (max-width: 768px) {
+  .gantt-filtros {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .gantt-legend {
+    justify-content: center;
+  }
+  
+  .timeline-header {
+    flex-direction: column;
+  }
+  
+  .gantt-task-row {
+    flex-direction: column;
+  }
+  
+  .task-chart {
+    min-width: auto;
+    min-height: 40px;
+    padding: 0.25rem;
+  }
+  
+  .task-column, .task-info {
+    width: 100%;
+    min-width: auto;
+  }
+  
+  .gantt-summary {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
 }
 
 .modal-header {
