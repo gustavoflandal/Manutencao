@@ -2,10 +2,20 @@
   <div class="preventiva-container">
     <div class="page-header">
       <h1>Manutenção Preventiva</h1>
-      <button class="btn btn-primary" @click="abrirFormulario()">
-        <i class="fas fa-plus"></i>
-        Novo Plano
-      </button>
+      <div class="header-actions">
+        <button class="btn btn-info" @click="abrirRelatorios">
+          <i class="fas fa-chart-bar"></i>
+          Relatórios
+        </button>
+        <button class="btn btn-warning" @click="gerarOrdensAutomaticas">
+          <i class="fas fa-magic"></i>
+          Gerar Ordens
+        </button>
+        <button class="btn btn-primary" @click="abrirFormulario()">
+          <i class="fas fa-plus"></i>
+          Novo Plano
+        </button>
+      </div>
     </div>
 
     <!-- Estatísticas -->
@@ -109,23 +119,36 @@
     </div>
 
     <!-- Toggle de visualização -->
-    <div class="view-toggle">
-      <button 
-        class="btn"
-        :class="{ 'btn-primary': viewMode === 'lista', 'btn-secondary': viewMode !== 'lista' }"
-        @click="viewMode = 'lista'"
-      >
-        <i class="fas fa-list"></i>
-        Lista
-      </button>
-      <button 
-        class="btn"
-        :class="{ 'btn-primary': viewMode === 'calendario', 'btn-secondary': viewMode !== 'calendario' }"
-        @click="viewMode = 'calendario'"
-      >
-        <i class="fas fa-calendar"></i>
-        Calendário
-      </button>
+    <div class="view-controls">
+      <div class="view-toggle">
+        <button 
+          class="btn"
+          :class="{ 'btn-primary': viewMode === 'lista', 'btn-secondary': viewMode !== 'lista' }"
+          @click="viewMode = 'lista'"
+        >
+          <i class="fas fa-list"></i>
+          Lista
+        </button>
+        <button 
+          class="btn"
+          :class="{ 'btn-primary': viewMode === 'calendario', 'btn-secondary': viewMode !== 'calendario' }"
+          @click="viewMode = 'calendario'"
+        >
+          <i class="fas fa-calendar"></i>
+          Calendário
+        </button>
+      </div>
+      
+      <div class="action-buttons">
+        <button class="btn btn-success" @click="atualizarMetricas">
+          <i class="fas fa-sync"></i>
+          Atualizar Métricas
+        </button>
+        <button class="btn btn-info" @click="verSugestoes">
+          <i class="fas fa-lightbulb"></i>
+          Sugestões
+        </button>
+      </div>
     </div>
 
     <!-- Visualização Lista -->
@@ -323,6 +346,219 @@
         </form>
       </div>
     </div>
+
+    <!-- Modal de Geração de Ordens -->
+    <div v-if="mostrarGeracaoOrdens" class="modal-overlay" @click="fecharGeracaoOrdens">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h3>Gerar Ordens de Serviço Automáticas</h3>
+          <button class="btn-close" @click="fecharGeracaoOrdens">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <form @submit.prevent="confirmarGeracaoOrdens" class="modal-body">
+          <div class="form-group">
+            <label>Dias de Antecedência:</label>
+            <input 
+              type="number" 
+              v-model="geracaoData.dias_antecedencia" 
+              min="0"
+              max="30"
+              placeholder="0"
+            />
+            <small>Incluir planos que vencem em até X dias</small>
+          </div>
+          
+          <div class="form-group">
+            <label>Prioridade Mínima:</label>
+            <select v-model="geracaoData.prioridade_minima">
+              <option value="baixa">Baixa</option>
+              <option value="normal">Normal</option>
+              <option value="alta">Alta</option>
+              <option value="critica">Crítica</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label>
+              <input 
+                type="checkbox" 
+                v-model="geracaoData.incluir_baseados_metrica"
+              />
+              Incluir planos baseados em métricas (horas/contador)
+            </label>
+          </div>
+          
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" @click="fecharGeracaoOrdens">
+              Cancelar
+            </button>
+            <button type="submit" class="btn btn-warning">
+              Gerar Ordens
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal de Sugestões -->
+    <div v-if="mostrarSugestoes" class="modal-overlay" @click="fecharSugestoes">
+      <div class="modal-content large-modal" @click.stop>
+        <div class="modal-header">
+          <h3>Sugestões de Otimização</h3>
+          <button class="btn-close" @click="fecharSugestoes">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <div class="modal-body">
+          <div v-if="sugestoes && sugestoes.length > 0">
+            <div class="sugestoes-stats">
+              <div class="stat-item">
+                <span class="stat-number">{{ sugestoes.length }}</span>
+                <span class="stat-label">Total de Sugestões</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-number">{{ sugestoesPorPrioridade.alta || 0 }}</span>
+                <span class="stat-label">Alta Prioridade</span>
+              </div>
+              <div class="stat-item">
+                <span class="stat-number">{{ sugestoesPorPrioridade.media || 0 }}</span>
+                <span class="stat-label">Média Prioridade</span>
+              </div>
+            </div>
+            
+            <div class="sugestoes-lista">
+              <div 
+                v-for="sugestao in sugestoes" 
+                :key="`${sugestao.plano_id}-${sugestao.tipo}`"
+                class="sugestao-item"
+                :class="getPrioridadeClass(sugestao.prioridade)"
+              >
+                <div class="sugestao-header">
+                  <span class="sugestao-tipo">{{ formatarTipoSugestao(sugestao.tipo) }}</span>
+                  <span class="sugestao-prioridade">{{ formatarPrioridade(sugestao.prioridade) }}</span>
+                </div>
+                <div class="sugestao-plano">
+                  <strong>{{ sugestao.plano_codigo }}</strong> - {{ sugestao.ativo_nome }}
+                </div>
+                <div class="sugestao-descricao">{{ sugestao.descricao }}</div>
+                <div class="sugestao-recomendacao">
+                  <strong>Recomendação:</strong> {{ sugestao.sugestao }}
+                </div>
+                <div v-if="sugestao.dados" class="sugestao-dados">
+                  <small>{{ formatarDadosSugestao(sugestao) }}</small>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else>
+            <div class="empty-state">
+              <i class="fas fa-check-circle"></i>
+              <h4>Nenhuma sugestão encontrada</h4>
+              <p>Todos os planos preventivos estão funcionando adequadamente!</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Relatórios -->
+    <div v-if="mostrarRelatorios" class="modal-overlay" @click="fecharRelatorios">
+      <div class="modal-content large-modal" @click.stop>
+        <div class="modal-header">
+          <h3>Relatório de Eficiência da Manutenção Preventiva</h3>
+          <button class="btn-close" @click="fecharRelatorios">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        
+        <div class="modal-body">
+          <!-- Filtros do relatório -->
+          <div class="relatorio-filtros">
+            <div class="filter-group">
+              <label>Data Início:</label>
+              <input type="date" v-model="relatorioFiltros.data_inicio" />
+            </div>
+            <div class="filter-group">
+              <label>Data Fim:</label>
+              <input type="date" v-model="relatorioFiltros.data_fim" />
+            </div>
+            <div class="filter-group">
+              <label>Setor:</label>
+              <select v-model="relatorioFiltros.setor_id">
+                <option value="">Todos</option>
+                <!-- TODO: Carregar setores -->
+              </select>
+            </div>
+            <button class="btn btn-primary" @click="carregarRelatorio">
+              <i class="fas fa-search"></i>
+              Gerar
+            </button>
+          </div>
+          
+          <!-- Conteúdo do relatório -->
+          <div v-if="relatorioEficiencia" class="relatorio-content">
+            <div class="relatorio-stats">
+              <div class="stat-card">
+                <div class="stat-value">{{ relatorioEficiencia.total_planos }}</div>
+                <div class="stat-label">Total de Planos</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value">{{ relatorioEficiencia.total_execucoes_realizadas }}</div>
+                <div class="stat-label">Execuções Realizadas</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value">{{ relatorioEficiencia.taxa_cumprimento }}%</div>
+                <div class="stat-label">Taxa de Cumprimento</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value">R$ {{ formatarMoeda(relatorioEficiencia.custo_total_preventiva) }}</div>
+                <div class="stat-label">Custo Total</div>
+              </div>
+            </div>
+            
+            <!-- Gráficos por categoria -->
+            <div class="relatorio-section">
+              <h4>Por Categoria</h4>
+              <div class="categoria-stats">
+                <div 
+                  v-for="(dados, categoria) in relatorioEficiencia.por_categoria" 
+                  :key="categoria"
+                  class="categoria-item"
+                >
+                  <div class="categoria-nome">{{ formatarCategoria(categoria) }}</div>
+                  <div class="categoria-dados">
+                    <span>{{ dados.total_planos }} planos</span>
+                    <span>{{ dados.total_execucoes }} execuções</span>
+                    <span>R$ {{ formatarMoeda(dados.custo_total) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Top ativos -->
+            <div class="relatorio-section">
+              <h4>Ativos com Mais Manutenções</h4>
+              <div class="top-ativos">
+                <div 
+                  v-for="ativo in relatorioEficiencia.top_ativos_manutencao.slice(0, 5)" 
+                  :key="ativo.ativo_id"
+                  class="ativo-item"
+                >
+                  <div class="ativo-nome">{{ ativo.nome }}</div>
+                  <div class="ativo-stats">
+                    <span>{{ ativo.total_manutencoes }} manutenções</span>
+                    <span>R$ {{ formatarMoeda(ativo.custo_total) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -347,8 +583,14 @@ export default {
     const viewMode = ref('lista')
     const mostrarFormulario = ref(false)
     const mostrarExecucao = ref(false)
+    const mostrarGeracaoOrdens = ref(false)
+    const mostrarSugestoes = ref(false)
+    const mostrarRelatorios = ref(false)
     const planoEdicao = ref(null)
     const planoExecucao = ref(null)
+    const sugestoes = ref([])
+    const sugestoesPorPrioridade = ref({})
+    const relatorioEficiencia = ref(null)
     
     // Calendário
     const mesAtual = ref(new Date().getMonth())
@@ -378,6 +620,21 @@ export default {
     const execucaoData = reactive({
       data_execucao: new Date().toISOString().split('T')[0],
       observacoes_execucao: ''
+    })
+    
+    // Geração de ordens
+    const geracaoData = reactive({
+      dias_antecedencia: 0,
+      prioridade_minima: 'baixa',
+      incluir_baseados_metrica: true
+    })
+    
+    // Filtros do relatório
+    const relatorioFiltros = reactive({
+      data_inicio: '',
+      data_fim: '',
+      setor_id: '',
+      categoria: ''
     })
     
     // Computed
@@ -623,6 +880,128 @@ export default {
       }
     }
     
+    // Novos métodos para funcionalidades avançadas
+    const abrirGeracaoOrdens = () => {
+      mostrarGeracaoOrdens.value = true
+    }
+    
+    const fecharGeracaoOrdens = () => {
+      mostrarGeracaoOrdens.value = false
+    }
+    
+    const gerarOrdensAutomaticas = () => {
+      abrirGeracaoOrdens()
+    }
+    
+    const confirmarGeracaoOrdens = async () => {
+      try {
+        loading.value = true
+        
+        const response = await api.post('/preventiva/gerar-ordens-automaticas', geracaoData)
+        
+        if (response.data.success) {
+          const resultado = response.data.data
+          showToast(
+            `${resultado.total_geradas} ordens geradas com sucesso${resultado.total_erros > 0 ? ` (${resultado.total_erros} erros)` : ''}`, 
+            'success'
+          )
+          
+          fecharGeracaoOrdens()
+          carregarPlanos(paginacao.current_page)
+        }
+      } catch (error) {
+        console.error('Erro ao gerar ordens automáticas:', error)
+        showToast('Erro ao gerar ordens automáticas', 'error')
+      } finally {
+        loading.value = false
+      }
+    }
+    
+    const atualizarMetricas = async () => {
+      try {
+        loading.value = true
+        
+        const response = await api.post('/preventiva/atualizar-metricas')
+        
+        if (response.data.success) {
+          const resultado = response.data.data
+          showToast(`${resultado.total_alertas} alertas de manutenção encontrados`, 'info')
+          carregarPlanos(paginacao.current_page)
+        }
+      } catch (error) {
+        console.error('Erro ao atualizar métricas:', error)
+        showToast('Erro ao atualizar métricas', 'error')
+      } finally {
+        loading.value = false
+      }
+    }
+    
+    const verSugestoes = async () => {
+      try {
+        loading.value = true
+        
+        const response = await api.get('/preventiva/otimizacoes/sugestoes')
+        
+        if (response.data.success) {
+          sugestoes.value = response.data.data.sugestoes
+          sugestoesPorPrioridade.value = response.data.data.por_prioridade
+          mostrarSugestoes.value = true
+        }
+      } catch (error) {
+        console.error('Erro ao carregar sugestões:', error)
+        showToast('Erro ao carregar sugestões', 'error')
+      } finally {
+        loading.value = false
+      }
+    }
+    
+    const fecharSugestoes = () => {
+      mostrarSugestoes.value = false
+      sugestoes.value = []
+    }
+    
+    const abrirRelatorios = () => {
+      // Definir período padrão (últimos 30 dias)
+      const hoje = new Date()
+      const trintaDiasAtras = new Date()
+      trintaDiasAtras.setDate(hoje.getDate() - 30)
+      
+      relatorioFiltros.data_inicio = trintaDiasAtras.toISOString().split('T')[0]
+      relatorioFiltros.data_fim = hoje.toISOString().split('T')[0]
+      
+      mostrarRelatorios.value = true
+      carregarRelatorio()
+    }
+    
+    const fecharRelatorios = () => {
+      mostrarRelatorios.value = false
+      relatorioEficiencia.value = null
+    }
+    
+    const carregarRelatorio = async () => {
+      try {
+        loading.value = true
+        
+        const params = {}
+        Object.keys(relatorioFiltros).forEach(key => {
+          if (relatorioFiltros[key]) {
+            params[key] = relatorioFiltros[key]
+          }
+        })
+        
+        const response = await api.get('/preventiva/relatorio/eficiencia', { params })
+        
+        if (response.data.success) {
+          relatorioEficiencia.value = response.data.data.estatisticas
+        }
+      } catch (error) {
+        console.error('Erro ao carregar relatório:', error)
+        showToast('Erro ao carregar relatório', 'error')
+      } finally {
+        loading.value = false
+      }
+    }
+    
     // Métodos de formatação
     const formatarData = (data) => {
       if (!data) return '-'
@@ -675,6 +1054,55 @@ export default {
       return `${meses[mes]} ${ano}`
     }
     
+    const formatarTipoSugestao = (tipo) => {
+      const tipos = {
+        'baixa_execucao': 'Baixa Execução',
+        'atraso_critico': 'Atraso Crítico',
+        'atraso_moderado': 'Atraso Moderado',
+        'custo_elevado': 'Custo Elevado'
+      }
+      return tipos[tipo] || tipo
+    }
+    
+    const formatarDadosSugestao = (sugestao) => {
+      const dados = sugestao.dados
+      if (!dados) return ''
+      
+      switch (sugestao.tipo) {
+        case 'baixa_execucao':
+          return `${dados.execucoes_por_mes} execuções por mês em ${dados.dias_criacao} dias`
+        case 'atraso_critico':
+        case 'atraso_moderado':
+          return `${dados.dias_atraso} dias de atraso - Vencimento: ${formatarData(dados.proxima_execucao)}`
+        case 'custo_elevado':
+          return `Custo: R$ ${formatarMoeda(dados.custo_real)} - Ordem: ${dados.ordem_codigo}`
+        default:
+          return ''
+      }
+    }
+    
+    const formatarMoeda = (valor) => {
+      if (!valor) return '0,00'
+      return parseFloat(valor).toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      })
+    }
+    
+    const formatarCategoria = (categoria) => {
+      const categorias = {
+        'lubrificacao': 'Lubrificação',
+        'inspecao': 'Inspeção',
+        'limpeza': 'Limpeza',
+        'calibracao': 'Calibração',
+        'substituicao': 'Substituição',
+        'ajuste': 'Ajuste',
+        'teste': 'Teste',
+        'outros': 'Outros'
+      }
+      return categorias[categoria] || categoria
+    }
+    
     // Classes CSS dinâmicas
     const getRowClass = (plano) => {
       return {
@@ -721,13 +1149,21 @@ export default {
       viewMode,
       mostrarFormulario,
       mostrarExecucao,
+      mostrarGeracaoOrdens,
+      mostrarSugestoes,
+      mostrarRelatorios,
       planoEdicao,
       planoExecucao,
+      sugestoes,
+      sugestoesPorPrioridade,
+      relatorioEficiencia,
       mesAtual,
       anoAtual,
       paginacao,
       filtros,
       execucaoData,
+      geracaoData,
+      relatorioFiltros,
       
       // Computed
       diasSemana,
@@ -749,11 +1185,31 @@ export default {
       excluirPlano,
       salvarPlano,
       onPlanoSalvo,
+      
+      // Novos métodos
+      abrirGeracaoOrdens,
+      fecharGeracaoOrdens,
+      gerarOrdensAutomaticas,
+      confirmarGeracaoOrdens,
+      atualizarMetricas,
+      verSugestoes,
+      fecharSugestoes,
+      abrirRelatorios,
+      fecharRelatorios,
+      carregarRelatorio,
+      
+      // Formatação
       formatarData,
       formatarPeriodicidade,
       formatarStatus,
       formatarPrioridade,
       formatarMesAno,
+      formatarTipoSugestao,
+      formatarDadosSugestao,
+      formatarMoeda,
+      formatarCategoria,
+      
+      // Classes CSS
       getRowClass,
       getBadgeClass,
       getPrioridadeClass,
@@ -780,6 +1236,11 @@ export default {
 .page-header h1 {
   margin: 0;
   color: #333;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
 }
 
 /* Estatísticas */
@@ -869,10 +1330,21 @@ export default {
 }
 
 /* Toggle de visualização */
+.view-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
 .view-toggle {
   display: flex;
   gap: 10px;
-  margin-bottom: 20px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 10px;
 }
 
 /* Tabela */
@@ -1063,6 +1535,10 @@ export default {
   overflow-y: auto;
 }
 
+.large-modal {
+  max-width: 1000px;
+}
+
 .modal-header {
   display: flex;
   justify-content: space-between;
@@ -1169,5 +1645,206 @@ export default {
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Sugestões */
+.sugestoes-stats {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-number {
+  font-size: 24px;
+  font-weight: bold;
+  color: #007bff;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #666;
+}
+
+.sugestoes-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.sugestao-item {
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 4px solid #ddd;
+}
+
+.sugestao-item.badge-danger {
+  border-left-color: #dc3545;
+  background: #f8d7da;
+}
+
+.sugestao-item.badge-warning {
+  border-left-color: #ffc107;
+  background: #fff3cd;
+}
+
+.sugestao-item.badge-info {
+  border-left-color: #17a2b8;
+  background: #d1ecf1;
+}
+
+.sugestao-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.sugestao-tipo {
+  font-weight: bold;
+  color: #333;
+}
+
+.sugestao-prioridade {
+  background: #007bff;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.sugestao-plano {
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.sugestao-descricao {
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.sugestao-recomendacao {
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.sugestao-dados {
+  color: #999;
+  font-style: italic;
+}
+
+/* Relatórios */
+.relatorio-filtros {
+  display: flex;
+  gap: 15px;
+  align-items: end;
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.relatorio-content {
+  margin-top: 20px;
+}
+
+.relatorio-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.relatorio-section {
+  margin-bottom: 30px;
+}
+
+.relatorio-section h4 {
+  margin-bottom: 15px;
+  color: #333;
+  border-bottom: 2px solid #007bff;
+  padding-bottom: 5px;
+}
+
+.categoria-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.categoria-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.categoria-nome {
+  font-weight: 500;
+}
+
+.categoria-dados {
+  display: flex;
+  gap: 15px;
+  font-size: 14px;
+  color: #666;
+}
+
+.top-ativos {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ativo-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 6px;
+}
+
+.ativo-nome {
+  font-weight: 500;
+}
+
+.ativo-stats {
+  display: flex;
+  gap: 15px;
+  font-size: 14px;
+  color: #666;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}
+
+.empty-state i {
+  font-size: 48px;
+  color: #28a745;
+  margin-bottom: 15px;
+}
+
+.empty-state h4 {
+  margin-bottom: 10px;
+  color: #333;
+}
+
+.empty-state p {
+  margin: 0;
 }
 </style>

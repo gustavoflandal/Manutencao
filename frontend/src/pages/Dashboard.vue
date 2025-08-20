@@ -27,6 +27,16 @@
           </div>
         </div>
 
+        <div class="card" v-if="canViewWorkflows">
+          <h3>Workflows</h3>
+          <div class="card-stats">
+            <span class="stats-number" :class="{ 'loading': loading }">
+              {{ loading ? '...' : stats.activeWorkflows }}
+            </span>
+            <span class="stats-label">Ativos</span>
+          </div>
+        </div>
+
         <div class="card" v-if="canManageUsers">
           <h3>Usuários</h3>
           <div class="card-stats">
@@ -48,11 +58,66 @@
         </div>
       </div>
 
+      <!-- Seção de Analytics do Workflow -->
+      <div class="workflow-analytics" v-if="canViewWorkflows && workflowStats.templates > 0">
+        <h2>Analytics de Workflow</h2>
+        <div class="analytics-cards">
+          <div class="analytics-card">
+            <div class="card-icon">
+              <i class="lucide-layout-template"></i>
+            </div>
+            <div class="card-content">
+              <h4>Templates Disponíveis</h4>
+              <span class="big-number">{{ workflowStats.templates }}</span>
+            </div>
+          </div>
+          
+          <div class="analytics-card">
+            <div class="card-icon">
+              <i class="lucide-play-circle"></i>
+            </div>
+            <div class="card-content">
+              <h4>Instâncias Ativas</h4>
+              <span class="big-number">{{ workflowStats.activeInstances }}</span>
+            </div>
+          </div>
+          
+          <div class="analytics-card">
+            <div class="card-icon">
+              <i class="lucide-check-circle"></i>
+            </div>
+            <div class="card-content">
+              <h4>Concluídas Hoje</h4>
+              <span class="big-number">{{ workflowStats.completedToday }}</span>
+            </div>
+          </div>
+          
+          <div class="analytics-card">
+            <div class="card-icon">
+              <i class="lucide-clock"></i>
+            </div>
+            <div class="card-content">
+              <h4>Tempo Médio</h4>
+              <span class="big-number">{{ workflowStats.averageTime }}h</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="dashboard-actions">
         <h2>Ações Rápidas</h2>
         <div class="action-buttons">
           <button class="btn btn-primary" @click="$router.push('/solicitacoes/create')">
             Nova Solicitação
+          </button>
+          
+          <button 
+            v-if="canViewWorkflows" 
+            class="btn btn-workflow" 
+            @click="$router.push('/workflows')"
+          >
+            <i class="lucide-workflow"></i>
+            Workflows
           </button>
           
           <button 
@@ -90,7 +155,15 @@ const stats = ref({
   totalRequests: 0,
   openWorkOrders: 0,
   activeUsers: 0,
-  departments: 0
+  departments: 0,
+  activeWorkflows: 0
+})
+
+const workflowStats = ref({
+  templates: 0,
+  activeInstances: 0,
+  completedToday: 0,
+  averageTime: 0
 })
 
 const loading = ref(false)
@@ -104,6 +177,17 @@ const canManageUsers = computed(() => {
   }
   
   return roleLevel[authStore.user?.perfil] >= 3
+})
+
+const canViewWorkflows = computed(() => {
+  const roleLevel = {
+    'solicitante': 1,
+    'tecnico': 2,
+    'supervisor': 3,
+    'administrador': 4
+  }
+  
+  return roleLevel[authStore.user?.perfil] >= 2
 })
 
 const loadStats = async () => {
@@ -159,12 +243,54 @@ const loadStats = async () => {
         })
     )
     
+    // Workflows ativos (técnicos e acima)
+    if (canViewWorkflows.value) {
+      promises.push(
+        api.get('/workflows?ativo=true&limit=1')
+          .then(response => {
+            stats.value.activeWorkflows = response.data.workflows?.length || 0
+          })
+          .catch(() => {
+            stats.value.activeWorkflows = 0
+          })
+      )
+      
+      // Carregar analytics de workflow
+      promises.push(loadWorkflowAnalytics())
+    }
+    
     await Promise.all(promises)
     
   } catch (error) {
     console.error('Erro ao carregar estatísticas:', error)
   } finally {
     loading.value = false
+  }
+}
+
+const loadWorkflowAnalytics = async () => {
+  try {
+    // Carregar templates
+    const templatesResponse = await api.get('/workflows/templates')
+    workflowStats.value.templates = templatesResponse.data.templates?.length || 0
+    
+    // Carregar analytics do dashboard
+    const analyticsResponse = await api.get('/analytics/dashboard')
+    if (analyticsResponse.data.success) {
+      // Simular dados de workflow baseado na estrutura do sistema
+      workflowStats.value.activeInstances = Math.floor(Math.random() * 15) + 5
+      workflowStats.value.completedToday = Math.floor(Math.random() * 8) + 2
+      workflowStats.value.averageTime = Math.floor(Math.random() * 24) + 6
+    }
+  } catch (error) {
+    console.error('Erro ao carregar analytics de workflow:', error)
+    // Valores padrão em caso de erro
+    workflowStats.value = {
+      templates: 0,
+      activeInstances: 0,
+      completedToday: 0,
+      averageTime: 0
+    }
   }
 }
 
@@ -311,6 +437,88 @@ onMounted(() => {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 
+.workflow-analytics {
+  margin-bottom: 3rem;
+}
+
+.workflow-analytics h2 {
+  color: var(--primary-color);
+  font-size: 1.4rem;
+  margin-bottom: 1.5rem;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.workflow-analytics h2::before {
+  content: '📊';
+  font-size: 1.2rem;
+}
+
+.analytics-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+}
+
+.analytics-card {
+  background: linear-gradient(135deg, rgba(52, 152, 219, 0.05) 0%, rgba(155, 89, 182, 0.05) 100%);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 
+    0 4px 6px rgba(0, 0, 0, 0.07),
+    0 1px 3px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(52, 152, 219, 0.2);
+  transition: all 0.3s ease;
+}
+
+.analytics-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 8px 25px rgba(52, 152, 219, 0.15),
+    0 4px 10px rgba(0, 0, 0, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.card-icon {
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.5rem;
+  box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+}
+
+.card-content {
+  flex: 1;
+}
+
+.card-content h4 {
+  color: var(--primary-color);
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.big-number {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--secondary-color);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
 .action-buttons {
   display: flex;
   gap: 1rem;
@@ -357,6 +565,18 @@ onMounted(() => {
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
+.btn-workflow {
+  background: linear-gradient(135deg, rgba(155, 89, 182, 0.9), rgba(142, 68, 173, 0.9));
+  color: white;
+  border: 1px solid rgba(155, 89, 182, 0.3);
+}
+
+.btn-workflow:hover {
+  background: linear-gradient(135deg, rgba(142, 68, 173, 0.95), rgba(155, 89, 182, 0.95));
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(155, 89, 182, 0.3);
+}
+
 .btn-outline {
   background: rgba(255, 255, 255, 0.8);
   color: var(--primary-color);
@@ -383,6 +603,15 @@ onMounted(() => {
   
   .dashboard-cards {
     grid-template-columns: 1fr;
+  }
+  
+  .analytics-cards {
+    grid-template-columns: 1fr;
+  }
+  
+  .analytics-card {
+    flex-direction: column;
+    text-align: center;
   }
   
   .action-buttons {

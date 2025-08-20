@@ -73,12 +73,21 @@ const requireRole = (minRole) => {
       const userRoleLevel = PERFIL_HIERARCHY[req.user.perfil];
       const requiredRoleLevel = PERFIL_HIERARCHY[minRole];
 
-      if (!userRoleLevel || !requiredRoleLevel) {
-        logger.error('Perfil inválido detectado:', {
+      if (!userRoleLevel) {
+        logger.error('Perfil de usuário inválido:', {
           userRole: req.user.perfil,
-          userRoleLevel: userRoleLevel,
-          requiredRole: minRole,
-          requiredRoleLevel: requiredRoleLevel
+          userId: req.user.id
+        });
+        
+        return res.status(500).json({
+          success: false,
+          message: 'Erro de configuração de perfil de usuário'
+        });
+      }
+
+      if (!requiredRoleLevel) {
+        logger.error('Perfil requerido inválido:', {
+          requiredRole: minRole
         });
         
         return res.status(500).json({
@@ -161,28 +170,34 @@ const requireAnyRole = (roles) => {
         });
       }
 
-      console.log('Debug requireAnyRole:', {
-        userRole: req.user.perfil,
-        allowedRoles: roles,
-        includes: roles.includes(req.user.perfil)
-      });
-
-      if (!roles.includes(req.user.perfil)) {
-        logger.warn('Acesso negado por perfil não autorizado:', {
-          userId: req.user.id,
-          userRole: req.user.perfil,
-          allowedRoles: roles,
-          path: req.path,
-          method: req.method
+      if (!Array.isArray(roles)) {
+        logger.error('requireAnyRole deve receber um array de perfis:', {
+          rolesReceived: roles,
+          rolesType: typeof roles
         });
-
-        return res.status(403).json({
+        return res.status(500).json({
           success: false,
-          message: 'Sem permissão para acessar este recurso'
+          message: 'Erro de configuração de permissões'
         });
       }
 
-      next();
+      if (roles.includes(req.user.perfil)) {
+        return next();
+      }
+
+      logger.warn('Acesso negado por perfil não autorizado:', {
+        userId: req.user.id,
+        userRole: req.user.perfil,
+        allowedRoles: roles,
+        path: req.path,
+        method: req.method
+      });
+
+      return res.status(403).json({
+        success: false,
+        message: 'Sem permissão para acessar este recurso'
+      });
+
     } catch (error) {
       logger.error('Erro no middleware de múltiplas permissões:', error);
       return res.status(500).json({

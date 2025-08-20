@@ -1,116 +1,124 @@
 <template>
-  <div class="login-container min-h-screen flex items-center justify-center bg-light">
-    <div class="login-card card shadow-xl" style="width: 100%; max-width: 400px;">
-      <div class="card-header text-center">
-        <div class="logo mb-4">
-          <i class="fas fa-tools text-4xl text-primary mb-2"></i>
-          <h1 class="text-2xl font-bold text-primary">UpKeep Pró 1.0</h1>
-          <p class="text-sm text-gray-600 mt-1">Sistema de Manutenção</p>
+  <div class="login-page">
+    <div class="login-container">
+      <!-- Área esquerda - Welcome Section -->
+      <div class="welcome-section">
+        <div class="welcome-content">
+          <div class="logo-container-welcome">
+            <img src="/UpKeep.png" alt="UpKeep Pró 1.0" class="logo-image-welcome">
+          </div>
+          <h1 class="welcome-title">BEM-VINDO</h1>
+          <h2 class="welcome-subtitle">SISTEMA DE MANUTENÇÃO</h2>
+          <p class="welcome-description">
+            Gerencie suas operações de manutenção de forma eficiente e organizada. 
+            Controle ativos, solicitações, estoque e muito mais em uma plataforma integrada.
+          </p>
         </div>
-        <p class="text-gray font-medium">Faça login para continuar</p>
       </div>
-      
-      <div class="card-body">
-        <!-- Alerta de erro -->
-        <div v-if="error" class="alert alert-danger">
-          <i class="fas fa-exclamation-circle"></i>
-          {{ error }}
-        </div>
-        
-        <!-- Formulário de login -->
-        <form @submit.prevent="handleSubmit">
-          <div class="form-group">
-            <label for="email" class="form-label">
-              <i class="fas fa-envelope"></i>
-              Email
-            </label>
-            <input
-              id="email"
-              v-model="form.email"
-              type="email"
-              class="form-input"
-              :class="{ error: errors.email }"
-              placeholder="Digite seu email"
-              required
-              autocomplete="email"
-            >
-            <div v-if="errors.email" class="form-error">
-              {{ errors.email }}
-            </div>
+
+      <!-- Área direita - Login Form -->
+      <div class="login-section">
+        <div class="login-card">
+          <h2 class="login-title">Login</h2>
+          <p class="login-subtitle">Acesse sua conta para continuar</p>
+          
+          <!-- Alerta de sucesso -->
+          <div v-if="successMessage" class="alert alert-success">
+            <i class="fas fa-check-circle"></i>
+            {{ successMessage }}
           </div>
           
-          <div class="form-group">
-            <label for="password" class="form-label">
-              <i class="fas fa-lock"></i>
-              Senha
-            </label>
-            <div class="password-input-container" style="position: relative;">
+          <!-- Alerta de erro -->
+          <div v-if="error" class="alert alert-error">
+            <i class="fas fa-exclamation-circle"></i>
+            {{ error }}
+          </div>
+          
+          <!-- Formulário de login -->
+          <form @submit.prevent="handleSubmit" class="login-form">
+            <div class="form-group">
               <input
-                id="password"
-                v-model="form.senha"
-                :type="showPassword ? 'text' : 'password'"
+                id="email"
+                v-model="form.email"
+                type="email"
                 class="form-input"
-                :class="{ error: errors.senha }"
-                placeholder="Digite sua senha"
+                :class="{ error: errors.email }"
+                placeholder="Email"
                 required
-                autocomplete="current-password"
+                autocomplete="email"
               >
-              <button
-                type="button"
-                class="password-toggle"
-                @click="togglePassword"
-                style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--color-gray); cursor: pointer;"
-              >
-                <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
-              </button>
+              <div v-if="errors.email" class="form-error">
+                {{ errors.email }}
+              </div>
             </div>
-            <div v-if="errors.senha" class="form-error">
-              {{ errors.senha }}
+            
+            <div class="form-group">
+              <div class="password-input-container">
+                <input
+                  id="password"
+                  v-model="form.senha"
+                  :type="showPassword ? 'text' : 'password'"
+                  class="form-input"
+                  :class="{ error: errors.senha }"
+                  placeholder="Senha"
+                  required
+                  autocomplete="current-password"
+                >
+                <button
+                  type="button"
+                  class="password-toggle"
+                  @click="togglePassword"
+                >
+                  {{ showPassword ? 'HIDE' : 'SHOW' }}
+                </button>
+              </div>
+              <div v-if="errors.senha" class="form-error">
+                {{ errors.senha }}
+              </div>
             </div>
-          </div>
-          
-          <div class="form-group">
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input
-                v-model="form.rememberMe"
-                type="checkbox"
-                style="margin: 0;"
-              >
-              <span class="text-sm text-gray">Lembrar de mim</span>
-            </label>
-          </div>
-          
-          <button
-            type="submit"
-            class="btn btn-primary btn-lg w-full"
-            :disabled="loading"
-          >
-            <div v-if="loading" class="loading"></div>
-            <i v-else class="fas fa-sign-in-alt"></i>
-            {{ loading ? 'Entrando...' : 'Entrar' }}
-          </button>
-        </form>
-      </div>
-      
-      <div class="card-footer text-center">
-        <p class="text-sm text-gray">
-          Problemas para acessar? 
-          <a href="#" class="text-secondary font-medium">Contate o administrador</a>
-        </p>
+            
+            <div class="form-group">
+              <label class="checkbox-label">
+                <input
+                  v-model="form.rememberMe"
+                  type="checkbox"
+                  class="form-checkbox"
+                >
+                <span>Lembrar de mim</span>
+              </label>
+            </div>
+            
+            <button
+              type="submit"
+              class="btn-login"
+              :disabled="loading"
+            >
+              <div v-if="loading" class="loading-spinner"></div>
+              {{ loading ? 'Entrando...' : 'Login' }}
+            </button>
+            
+            <div class="login-links">
+              <a href="#" @click.prevent="goToForgotPassword" class="forgot-password">Esqueceu a senha?</a>
+              <span class="separator">•</span>
+              <a href="#" @click.prevent="goToRegister" class="signup-link">Cadastre-se</a>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, reactive } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, reactive, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 export default {
   name: 'Login',
   setup() {
     const router = useRouter()
+    const route = useRoute()
     const authStore = useAuthStore()
     
     // Estado do formulário
@@ -123,7 +131,17 @@ export default {
     const errors = ref({})
     const loading = ref(false)
     const error = ref('')
+    const successMessage = ref('')
     const showPassword = ref(false)
+    
+    // Verificar se há mensagem na query string
+    onMounted(() => {
+      if (route.query.message) {
+        successMessage.value = route.query.message
+        // Limpar a query string
+        router.replace({ path: '/login' })
+      }
+    })
     
     // Validar formulário
     const validateForm = () => {
@@ -181,142 +199,407 @@ export default {
       showPassword.value = !showPassword.value
     }
     
+    // Navegação
+    const goToForgotPassword = () => {
+      router.push('/forgot-password')
+    }
+    
+    const goToRegister = () => {
+      router.push('/register')
+    }
+    
     return {
       form,
       errors,
       loading,
       error,
+      successMessage,
       showPassword,
       handleSubmit,
-      togglePassword
+      togglePassword,
+      goToForgotPassword,
+      goToRegister
     }
   }
 }
 </script>
 
 <style scoped>
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f7fa;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
 .login-container {
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+  max-width: 1000px;
+  height: 650px;
+  background: white;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+}
+
+/* Seção Welcome (Esquerda) */
+.welcome-section {
+  background: linear-gradient(135deg, #4A90E2 0%, #357ABD 50%, #2C5F91 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
   position: relative;
   overflow: hidden;
 }
 
-.login-container::before {
+.welcome-section::before {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image: 
-    radial-gradient(circle at 15% 30%, rgba(173, 181, 189, 0.04) 0%, transparent 50%),
-    radial-gradient(circle at 85% 70%, rgba(108, 117, 125, 0.03) 0%, transparent 50%),
-    radial-gradient(circle at 50% 10%, rgba(173, 181, 189, 0.025) 0%, transparent 50%),
-    linear-gradient(45deg, transparent 30%, rgba(173, 181, 189, 0.015) 50%, transparent 70%);
-  background-size: 400px 400px, 500px 500px, 300px 300px, 200px 200px;
-  animation: backgroundFloat 20s ease-in-out infinite;
-  z-index: 0;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+  animation: float 6s ease-in-out infinite;
 }
 
-.login-container::after {
-  content: '⚙️';
+.welcome-section::after {
+  content: '';
   position: absolute;
-  top: 10%;
-  right: 15%;
-  font-size: 5rem;
-  opacity: 0.015;
-  z-index: 0;
-  animation: rotate 30s linear infinite;
+  bottom: -20%;
+  right: -20%;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 50%);
+  animation: float 8s ease-in-out infinite reverse;
 }
 
-@keyframes backgroundFloat {
-  0%, 100% {
-    transform: translateY(0px) rotate(0deg);
-  }
-  33% {
-    transform: translateY(-10px) rotate(1deg);
-  }
-  66% {
-    transform: translateY(5px) rotate(-1deg);
-  }
+.welcome-content {
+  position: relative;
+  z-index: 1;
+  color: white;
+  text-align: center;
 }
 
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.logo-container-welcome {
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.logo-image-welcome {
+  width: 280px;
+  height: 280px;
+  object-fit: contain;
+  opacity: 1;
+}
+
+.welcome-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 0.3rem;
+  letter-spacing: 2px;
+  text-shadow: none;
+}
+
+.welcome-subtitle {
+  font-size: 1.2rem;
+  font-weight: 500;
+  margin-bottom: 2rem;
+  letter-spacing: 1px;
+  opacity: 1;
+  color: white;
+}
+
+.welcome-description {
+  font-size: 1rem;
+  line-height: 1.6;
+  opacity: 1;
+  color: white;
+  max-width: 400px;
+}
+
+/* Seção Login (Direita) */
+.login-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem;
+  background: white;
 }
 
 .login-card {
-  animation: slideUp 0.8s ease-out;
-  position: relative;
-  z-index: 1;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(173, 181, 189, 0.2);
-  box-shadow: 
-    0 20px 25px -5px rgba(0, 0, 0, 0.1),
-    0 10px 10px -5px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  width: 100%;
+  max-width: 400px;
 }
 
-@keyframes slideUp {
-  from {
-    opacity: 0;
-    transform: translateY(50px) scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
+.login-title {
+  font-size: 2rem;
+  font-weight: 600;
+  color: #2C3E50;
+  margin-bottom: 0.5rem;
+  text-align: center;
 }
 
-.logo i {
-  animation: pulse 3s infinite;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+.login-subtitle {
+  font-size: 1rem;
+  color: #6C757D;
+  margin-bottom: 2rem;
+  text-align: center;
 }
 
-@keyframes pulse {
-  0%, 100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.08);
-  }
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
 }
 
-.logo h1 {
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  letter-spacing: 0.5px;
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-input {
+  padding: 1rem;
+  border: 2px solid #E9ECEF;
+  border-radius: 10px;
+  font-size: 1rem;
+  transition: all 0.3s;
+  background: #F8F9FA;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #4A90E2;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.form-input.error {
+  border-color: #E74C3C;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #6C757D;
+}
+
+.form-checkbox {
+  margin: 0;
+  accent-color: #4A90E2;
 }
 
 .password-input-container {
   position: relative;
 }
 
-.password-toggle:hover {
-  color: var(--color-primary) !important;
+.password-toggle {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #4A90E2;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
 }
 
-.form-input:focus + .password-toggle {
-  color: var(--color-secondary) !important;
+.password-toggle:hover {
+  color: #357ABD;
+}
+
+.btn-login {
+  padding: 1rem;
+  background: linear-gradient(135deg, #4A90E2 0%, #357ABD 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.btn-login:hover:not(:disabled) {
+  background: linear-gradient(135deg, #357ABD 0%, #2C5F91 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(74, 144, 226, 0.3);
+}
+
+.btn-login:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.login-links {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.separator {
+  color: #DEE2E6;
+  font-weight: bold;
+}
+
+.forgot-password {
+  color: #4A90E2;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.forgot-password:hover {
+  text-decoration: underline;
+}
+
+.signup-link {
+  color: #4A90E2;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.signup-link:hover {
+  text-decoration: underline;
+}
+
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.alert-success {
+  background: #F0F9FF;
+  color: #059669;
+  border: 1px solid #A7F3D0;
+}
+
+.alert-error {
+  background: #FDF2F2;
+  color: #E74C3C;
+  border: 1px solid #F5C6CB;
+}
+
+.form-error {
+  color: #E74C3C;
+  font-size: 0.85rem;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* Responsividade */
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
   .login-container {
-    padding: var(--spacing-md);
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: 100vh;
   }
   
-  .login-card {
-    margin: 0;
+  .welcome-section {
+    padding: 3rem 2rem;
+    min-height: 40vh;
   }
   
-  .card-header h1 {
-    font-size: var(--font-size-xl);
+  .welcome-title {
+    font-size: 2.5rem;
+  }
+  
+  .welcome-subtitle {
+    font-size: 1.2rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .login-page {
+    padding: 1rem;
+  }
+  
+  .login-container {
+    border-radius: 12px;
+  }
+  
+  .welcome-section {
+    padding: 2rem 1.5rem;
+    text-align: center;
+  }
+  
+  .login-section {
+    padding: 2rem 1.5rem;
+  }
+  
+  .welcome-title {
+    font-size: 2rem;
+  }
+  
+  .welcome-description {
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-links {
+    flex-direction: column;
+    gap: 0.8rem;
+    margin-top: 1rem;
+  }
+  
+  .separator {
+    display: none;
+  }
+  
+  .welcome-title {
+    font-size: 1.8rem;
+  }
+  
+  .welcome-subtitle {
+    font-size: 1rem;
+  }
+}
+
+/* Animações */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-20px) rotate(10deg);
   }
 }
 </style>

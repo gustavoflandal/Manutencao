@@ -10,7 +10,7 @@ module.exports = (sequelize) => {
     numero: {
       type: DataTypes.STRING(20),
       unique: true,
-      allowNull: true  // Permitir null temporariamente para o hook funcionar
+      allowNull: false  // Campo obrigatório após hook
     },
     titulo: {
       type: DataTypes.STRING(200),
@@ -92,26 +92,76 @@ module.exports = (sequelize) => {
     tableName: 'solicitacoes',
     hooks: {
       beforeCreate: async (solicitacao, options) => {
+        // Se o número já foi definido, não sobrescrever
+        if (solicitacao.numero) return;
+
         try {
-          // Gerar número sequencial único
-          const count = await sequelize.query(
-            'SELECT COUNT(*) as total FROM solicitacoes', 
+          // Buscar o maior número existente
+          const ultimaSolicitacao = await sequelize.query(
+            `SELECT numero FROM solicitacoes 
+             WHERE numero LIKE 'SOL%' 
+             ORDER BY CAST(SUBSTRING(numero, 4) AS UNSIGNED) DESC 
+             LIMIT 1`, 
             { 
               type: sequelize.QueryTypes.SELECT,
               transaction: options.transaction 
             }
           );
-          const nextNumber = (count[0]?.total || 0) + 1;
-          solicitacao.numero = `SOL${String(nextNumber).padStart(6, '0')}`;
+
+          let proximoNumero = 1;
+          
+          if (ultimaSolicitacao.length > 0) {
+            const ultimoNumeroStr = ultimaSolicitacao[0].numero;
+            const ultimoNumero = parseInt(ultimoNumeroStr.substring(3));
+            proximoNumero = ultimoNumero + 1;
+          }
+
+          solicitacao.numero = `SOL${String(proximoNumero).padStart(6, '0')}`;
+          
         } catch (error) {
           console.error('Erro ao gerar número da solicitação:', error);
-          // Fallback: usar timestamp
-          const timestamp = Date.now().toString().slice(-6);
-          solicitacao.numero = `SOL${timestamp}`;
+          // Fallback: usar timestamp + random
+          const timestamp = Date.now().toString().slice(-4);
+          const random = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+          solicitacao.numero = `SOL${timestamp}${random}`;
         }
       }
     }
   });
+
+  // Definir associações
+  Solicitacao.associate = (models) => {
+    Solicitacao.belongsTo(models.User, {
+      foreignKey: 'solicitante_id',
+      as: 'solicitante'
+    });
+
+    Solicitacao.belongsTo(models.User, {
+      foreignKey: 'responsavel_id',
+      as: 'responsavel'
+    });
+
+    Solicitacao.belongsTo(models.Department, {
+      foreignKey: 'department_id',
+      as: 'department'
+    });
+
+    Solicitacao.belongsTo(models.Category, {
+      foreignKey: 'category_id',
+      as: 'category'
+    });
+
+    Solicitacao.belongsTo(models.SubCategory, {
+      foreignKey: 'subcategory_id',
+      as: 'subcategory'
+    });
+
+    // Relação com Ordem de Serviço
+    Solicitacao.hasMany(models.OrdemServico, {
+      foreignKey: 'solicitacao_id',
+      as: 'ordens_servico'
+    });
+  };
 
   return Solicitacao;
 };

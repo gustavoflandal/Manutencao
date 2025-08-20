@@ -1,4 +1,4 @@
-const { PlanoPreventivo, Ativo, Setor, User } = require('../models');
+const { PlanoPreventivo, Ativo, Setor, User, OrdemServico } = require('../models');
 const { Op } = require('sequelize');
 const logger = require('../config/logger');
 
@@ -697,6 +697,595 @@ class PlanoPreventivosController {
 
     } catch (error) {
       logger.error('Erro ao obter calendário:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro interno do servidor'
+      });
+    }
+  }
+
+  // Gerar ordens de serviço automaticamente para planos vencidos
+  async gerarOrdensAutomaticas(req, res) {
+    try {
+      const { 
+        dias_antecedencia = 0,
+        prioridade_minima = 'baixa',
+        incluir_baseados_metrica = true 
+      } = req.body;
+
+      const hoje = new Date();
+      const dataLimite = new Date();
+      dataLimite.setDate(hoje.getDate() + parseInt(dias_antecedencia));
+
+      // Buscar planos que precisam de manutenção
+      const where = {
+        ativo: true,
+        [Op.or]: [
+          {
+            // Planos vencidos ou próximos ao vencimento por data
+            proxima_execucao: {
+              [Op.lte]: dataLimite
+            }
+          }
+        ]
+      };
+
+      // Filtro por prioridade
+      const prioridades = ['baixa', 'normal', 'alta', 'critica'];
+      const indicePrioridadeMinima = prioridades.indexOf(prioridade_minima);
+      if (indicePrioridadeMinima > 0) {
+        where.prioridade = {
+          [Op.in]: prioridades.slice(indicePrioridadeMinima)
+        };
+      }
+
+      const planos = await PlanoPreventivo.findAll({
+        where,
+        include: [
+          { 
+            model: Ativo, 
+            as: 'ativoObj',
+            attributes: ['id', 'nome', 'codigo_patrimonio', 'horas_funcionamento', 'contador_producao']
+          },
+          { 
+            model: Setor, 
+            as: 'setorObj',
+            attributes: ['id', 'nome']
+          },
+          { 
+            model: User, 
+            as: 'responsavelObj',
+            attributes: ['id', 'nome', 'email']
+          }
+        ]
+      });
+
+      const ordensGeradas = [];
+      const erros = [];
+
+      for (const plano of planos) {
+        try {
+          // Verificar se já existe uma ordem em aberto para este plano
+          const ordemExistente = await OrdemServico.findOne({
+            where: {
+              plano_preventivo_id: plano.id,
+              status: {
+                [Op.in]: ['aberto', 'em_andamento', 'pendente']
+              }
+            }
+          });
+
+          if (ordemExistente) {
+            continue; // Pular se já existe ordem em aberto
+          }
+
+          // Verificar se precisa manutenção por métrica
+          let precisaManutencao = true;
+          if (incluir_baseados_metrica && 
+              (plano.tipo_periodicidade === 'horas_funcionamento' || 
+               plano.tipo_periodicidade === 'contador_producao')) {
+            precisaManutencao = await plano.precisaManutencaoByMetrica();
+          }
+
+          if (!precisaManutencao) {
+            continue;
+          }
+
+          // Criar ordem de serviço
+          const ordemData = {
+            codigo: null, // Será gerado automaticamente
+            titulo: `Manutenção Preventiva - ${plano.nome}`,
+            descricao: `Ordem gerada automaticamente para o plano preventivo ${plano.codigo}.\n\n${plano.procedimento || ''}`,
+            tipo: 'preventiva',
+            prioridade: plano.prioridade,
+            status: 'aberto',
+            ativo_id: plano.ativo_id,
+            setor_id: plano.setor_id,
+            solicitante_id: plano.responsavel_id || 1, // Usar ID do admin se não há responsável
+            responsavel_id: plano.responsavel_id,
+            plano_preventivo_id: plano.id,
+            data_prevista_inicio: plano.proxima_execucao,
+            duracao_estimada: plano.duracao_estimada,
+            custo_estimado: plano.custo_estimado,
+            procedimento: plano.procedimento,
+            ferramentas_necessarias: plano.ferramentas_necessarias,
+            pecas_necessarias: plano.pecas_necessarias,
+            observacoes: `Gerada automaticamente em ${hoje.toISOString().split('T')[0]} para o plano preventivo ${plano.codigo}`
+          };
+
+          const ordem = await OrdemServico.create(ordemData);
+
+          ordensGeradas.push({
+            ordem_id: ordem.id,
+            ordem_codigo: ordem.codigo,
+            plano_id: plano.id,
+            plano_codigo: plano.codigo,
+            ativo_nome: plano.ativoObj?.nome,
+            data_prevista: plano.proxima_execucao
+          });
+
+          logger.info(`Ordem de serviço gerada automaticamente: ${ordem.codigo} para plano ${plano.codigo}`, {
+            ordemId: ordem.id,
+            planoId: plano.id
+          });
+
+        } catch (error) {
+          erros.push({
+            plano_id: plano.id,
+            plano_codigo: plano.codigo,
+            erro: error.message
+          });
+          logger.error(`Erro ao gerar ordem para plano ${plano.codigo}:`, error);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `${ordensGeradas.length} ordens de serviço geradas automaticamente`,
+        data: {
+          ordens_geradas: ordensGeradas,
+          total_geradas: ordensGeradas.length,
+          erros: erros,
+          total_erros: erros.length
+        }
+      });
+
+    } catch (error) {
+      logger.error('Erro ao gerar ordens automáticas:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro interno do servidor'
+      });
+    }
+  }
+
+  // Atualizar planos baseados em métricas (horas/contador)
+  async atualizarPlanosMetricas(req, res) {
+    try {
+      const planos = await PlanoPreventivo.findAll({
+        where: {
+          ativo: true,
+          tipo_periodicidade: {
+            [Op.in]: ['horas_funcionamento', 'contador_producao']
+          }
+        },
+        include: [
+          { 
+            model: Ativo, 
+            as: 'ativoObj',
+            attributes: ['id', 'nome', 'horas_funcionamento', 'contador_producao']
+          }
+        ]
+      });
+
+      const planosAtualizados = [];
+      const alertas = [];
+
+      for (const plano of planos) {
+        try {
+          const precisaManutencao = await plano.precisaManutencaoByMetrica();
+          
+          if (precisaManutencao) {
+            alertas.push({
+              plano_id: plano.id,
+              plano_codigo: plano.codigo,
+              ativo_nome: plano.ativoObj?.nome,
+              tipo_periodicidade: plano.tipo_periodicidade,
+              valor_atual: plano.tipo_periodicidade === 'horas_funcionamento' 
+                ? plano.ativoObj?.horas_funcionamento 
+                : plano.ativoObj?.contador_producao,
+              limite: plano.tipo_periodicidade === 'horas_funcionamento' 
+                ? plano.horas_funcionamento_limite 
+                : plano.contador_producao_limite,
+              valor_ultima_execucao: plano.tipo_periodicidade === 'horas_funcionamento' 
+                ? plano.executado_horas 
+                : plano.executado_contador
+            });
+          }
+
+          planosAtualizados.push({
+            plano_id: plano.id,
+            plano_codigo: plano.codigo,
+            precisa_manutencao: precisaManutencao
+          });
+
+        } catch (error) {
+          logger.error(`Erro ao verificar plano ${plano.codigo}:`, error);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: `${planos.length} planos verificados`,
+        data: {
+          planos_verificados: planosAtualizados,
+          alertas_manutencao: alertas,
+          total_alertas: alertas.length
+        }
+      });
+
+    } catch (error) {
+      logger.error('Erro ao atualizar planos por métricas:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro interno do servidor'
+      });
+    }
+  }
+
+  // Relatório de eficiência da manutenção preventiva
+  async relatorioEficiencia(req, res) {
+    try {
+      const { 
+        data_inicio,
+        data_fim,
+        setor_id,
+        categoria 
+      } = req.query;
+
+      const whereClause = { ativo: true };
+      const whereOrdem = {};
+
+      // Filtros por data
+      if (data_inicio && data_fim) {
+        whereOrdem.created_at = {
+          [Op.between]: [new Date(data_inicio), new Date(data_fim)]
+        };
+      }
+
+      if (setor_id) {
+        whereClause.setor_id = setor_id;
+      }
+
+      if (categoria) {
+        whereClause.categoria = categoria;
+      }
+
+      // Buscar planos e suas execuções
+      const planos = await PlanoPreventivo.findAll({
+        where: whereClause,
+        include: [
+          { 
+            model: Ativo, 
+            as: 'ativoObj',
+            attributes: ['id', 'nome', 'valor_aquisicao', 'mtbf', 'mttr']
+          },
+          { 
+            model: Setor, 
+            as: 'setorObj',
+            attributes: ['id', 'nome']
+          }
+        ]
+      });
+
+      // Buscar ordens de serviço relacionadas
+      const ordensPreventivas = await OrdemServico.findAll({
+        where: {
+          ...whereOrdem,
+          tipo: 'preventiva',
+          plano_preventivo_id: {
+            [Op.ne]: null
+          },
+          status: 'finalizado'
+        },
+        include: [
+          {
+            model: PlanoPreventivo,
+            as: 'planoPreventivo',
+            where: whereClause,
+            include: [
+              { model: Ativo, as: 'ativoObj' }
+            ]
+          }
+        ]
+      });
+
+      // Calcular estatísticas
+      const estatisticas = {
+        total_planos: planos.length,
+        planos_ativos: planos.filter(p => p.ativo).length,
+        total_execucoes_realizadas: ordensPreventivas.length,
+        
+        // Por categoria
+        por_categoria: {},
+        
+        // Por setor
+        por_setor: {},
+        
+        // Eficiência geral
+        taxa_cumprimento: 0,
+        custo_total_preventiva: 0,
+        tempo_total_preventiva: 0,
+        
+        // Top ativos com mais manutenções
+        top_ativos_manutencao: {},
+        
+        // Planos mais executados
+        planos_mais_executados: []
+      };
+
+      // Agrupar por categoria
+      planos.forEach(plano => {
+        if (!estatisticas.por_categoria[plano.categoria]) {
+          estatisticas.por_categoria[plano.categoria] = {
+            total_planos: 0,
+            total_execucoes: 0,
+            custo_total: 0
+          };
+        }
+        estatisticas.por_categoria[plano.categoria].total_planos++;
+        estatisticas.por_categoria[plano.categoria].total_execucoes += plano.total_execucoes;
+      });
+
+      // Agrupar por setor
+      planos.forEach(plano => {
+        const setorNome = plano.setorObj?.nome || 'Sem setor';
+        if (!estatisticas.por_setor[setorNome]) {
+          estatisticas.por_setor[setorNome] = {
+            total_planos: 0,
+            total_execucoes: 0,
+            custo_total: 0
+          };
+        }
+        estatisticas.por_setor[setorNome].total_planos++;
+        estatisticas.por_setor[setorNome].total_execucoes += plano.total_execucoes;
+      });
+
+      // Calcular custos e tempos das ordens
+      ordensPreventivas.forEach(ordem => {
+        estatisticas.custo_total_preventiva += parseFloat(ordem.custo_real || ordem.custo_estimado || 0);
+        estatisticas.tempo_total_preventiva += parseInt(ordem.duracao_real || ordem.duracao_estimada || 0);
+        
+        const categoria = ordem.planoPreventivo.categoria;
+        if (estatisticas.por_categoria[categoria]) {
+          estatisticas.por_categoria[categoria].custo_total += parseFloat(ordem.custo_real || ordem.custo_estimado || 0);
+        }
+        
+        const setorNome = ordem.planoPreventivo.setorObj?.nome || 'Sem setor';
+        if (estatisticas.por_setor[setorNome]) {
+          estatisticas.por_setor[setorNome].custo_total += parseFloat(ordem.custo_real || ordem.custo_estimado || 0);
+        }
+      });
+
+      // Top ativos
+      const ativosContador = {};
+      ordensPreventivas.forEach(ordem => {
+        const ativoId = ordem.ativo_id;
+        const ativoNome = ordem.planoPreventivo.ativoObj?.nome || 'Ativo desconhecido';
+        
+        if (!ativosContador[ativoId]) {
+          ativosContador[ativoId] = {
+            nome: ativoNome,
+            total_manutencoes: 0,
+            custo_total: 0
+          };
+        }
+        
+        ativosContador[ativoId].total_manutencoes++;
+        ativosContador[ativoId].custo_total += parseFloat(ordem.custo_real || ordem.custo_estimado || 0);
+      });
+
+      estatisticas.top_ativos_manutencao = Object.entries(ativosContador)
+        .sort(([,a], [,b]) => b.total_manutencoes - a.total_manutencoes)
+        .slice(0, 10)
+        .map(([id, dados]) => ({ ativo_id: id, ...dados }));
+
+      // Planos mais executados
+      estatisticas.planos_mais_executados = planos
+        .sort((a, b) => b.total_execucoes - a.total_execucoes)
+        .slice(0, 10)
+        .map(plano => ({
+          plano_id: plano.id,
+          codigo: plano.codigo,
+          nome: plano.nome,
+          categoria: plano.categoria,
+          total_execucoes: plano.total_execucoes,
+          ativo_nome: plano.ativoObj?.nome
+        }));
+
+      // Taxa de cumprimento (ordens finalizadas vs ordens criadas)
+      const totalOrdensPreventivas = await OrdemServico.count({
+        where: {
+          ...whereOrdem,
+          tipo: 'preventiva',
+          plano_preventivo_id: { [Op.ne]: null }
+        }
+      });
+
+      if (totalOrdensPreventivas > 0) {
+        estatisticas.taxa_cumprimento = (ordensPreventivas.length / totalOrdensPreventivas * 100).toFixed(2);
+      }
+
+      res.json({
+        success: true,
+        data: { 
+          estatisticas,
+          periodo: {
+            data_inicio: data_inicio || 'Desde o início',
+            data_fim: data_fim || 'Até agora'
+          }
+        }
+      });
+
+    } catch (error) {
+      logger.error('Erro ao gerar relatório de eficiência:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro interno do servidor'
+      });
+    }
+  }
+
+  // Sugerir otimizações nos planos preventivos
+  async sugerirOtimizacoes(req, res) {
+    try {
+      const sugestoes = [];
+
+      // Buscar planos com baixa taxa de execução
+      const planosBaixaExecucao = await PlanoPreventivo.findAll({
+        where: {
+          ativo: true,
+          created_at: {
+            [Op.lt]: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) // Criados há mais de 90 dias
+          }
+        },
+        include: [
+          { model: Ativo, as: 'ativoObj', attributes: ['id', 'nome'] }
+        ]
+      });
+
+      planosBaixaExecucao.forEach(plano => {
+        const diasCriacao = Math.floor((new Date() - new Date(plano.created_at)) / (1000 * 60 * 60 * 24));
+        const execucoesPorMes = (plano.total_execucoes / diasCriacao) * 30;
+
+        if (execucoesPorMes < 0.5) { // Menos de 0.5 execuções por mês
+          sugestoes.push({
+            tipo: 'baixa_execucao',
+            prioridade: 'media',
+            plano_id: plano.id,
+            plano_codigo: plano.codigo,
+            ativo_nome: plano.ativoObj?.nome,
+            descricao: `Plano com baixa taxa de execução (${plano.total_execucoes} execuções em ${diasCriacao} dias)`,
+            sugestao: 'Revisar periodicidade ou desativar se não necessário',
+            dados: {
+              total_execucoes: plano.total_execucoes,
+              dias_criacao: diasCriacao,
+              execucoes_por_mes: execucoesPorMes.toFixed(2)
+            }
+          });
+        }
+      });
+
+      // Buscar planos frequentemente atrasados
+      const planosAtrasados = await PlanoPreventivo.findAll({
+        where: {
+          ativo: true,
+          proxima_execucao: {
+            [Op.lt]: new Date()
+          }
+        },
+        include: [
+          { model: Ativo, as: 'ativoObj', attributes: ['id', 'nome'] }
+        ]
+      });
+
+      planosAtrasados.forEach(plano => {
+        const diasAtraso = Math.floor((new Date() - new Date(plano.proxima_execucao)) / (1000 * 60 * 60 * 24));
+        
+        if (diasAtraso > 30) { // Atrasado há mais de 30 dias
+          sugestoes.push({
+            tipo: 'atraso_critico',
+            prioridade: 'alta',
+            plano_id: plano.id,
+            plano_codigo: plano.codigo,
+            ativo_nome: plano.ativoObj?.nome,
+            descricao: `Plano crítico com ${diasAtraso} dias de atraso`,
+            sugestao: 'Execução urgente ou revisão da periodicidade',
+            dados: {
+              dias_atraso: diasAtraso,
+              proxima_execucao: plano.proxima_execucao
+            }
+          });
+        } else if (diasAtraso > 7) {
+          sugestoes.push({
+            tipo: 'atraso_moderado',
+            prioridade: 'media',
+            plano_id: plano.id,
+            plano_codigo: plano.codigo,
+            ativo_nome: plano.ativoObj?.nome,
+            descricao: `Plano com ${diasAtraso} dias de atraso`,
+            sugestao: 'Programar execução em breve',
+            dados: {
+              dias_atraso: diasAtraso,
+              proxima_execucao: plano.proxima_execucao
+            }
+          });
+        }
+      });
+
+      // Buscar planos com custos elevados
+      const ordensCaras = await OrdemServico.findAll({
+        where: {
+          tipo: 'preventiva',
+          status: 'finalizado',
+          plano_preventivo_id: { [Op.ne]: null },
+          custo_real: { [Op.gt]: 1000 } // Custo real maior que R$ 1000
+        },
+        include: [
+          {
+            model: PlanoPreventivo,
+            as: 'planoPreventivo',
+            include: [
+              { model: Ativo, as: 'ativoObj', attributes: ['id', 'nome'] }
+            ]
+          }
+        ],
+        order: [['custo_real', 'DESC']],
+        limit: 10
+      });
+
+      ordensCaras.forEach(ordem => {
+        sugestoes.push({
+          tipo: 'custo_elevado',
+          prioridade: 'media',
+          plano_id: ordem.plano_preventivo_id,
+          plano_codigo: ordem.planoPreventivo.codigo,
+          ativo_nome: ordem.planoPreventivo.ativoObj?.nome,
+          descricao: `Manutenção com custo elevado: R$ ${ordem.custo_real}`,
+          sugestao: 'Revisar procedimentos e fornecedores para reduzir custos',
+          dados: {
+            custo_real: ordem.custo_real,
+            ordem_codigo: ordem.codigo,
+            data_execucao: ordem.data_finalizacao
+          }
+        });
+      });
+
+      // Ordenar sugestões por prioridade
+      const prioridadeOrdem = { 'alta': 3, 'media': 2, 'baixa': 1 };
+      sugestoes.sort((a, b) => prioridadeOrdem[b.prioridade] - prioridadeOrdem[a.prioridade]);
+
+      res.json({
+        success: true,
+        data: {
+          sugestoes,
+          total_sugestoes: sugestoes.length,
+          por_tipo: {
+            baixa_execucao: sugestoes.filter(s => s.tipo === 'baixa_execucao').length,
+            atraso_critico: sugestoes.filter(s => s.tipo === 'atraso_critico').length,
+            atraso_moderado: sugestoes.filter(s => s.tipo === 'atraso_moderado').length,
+            custo_elevado: sugestoes.filter(s => s.tipo === 'custo_elevado').length
+          },
+          por_prioridade: {
+            alta: sugestoes.filter(s => s.prioridade === 'alta').length,
+            media: sugestoes.filter(s => s.prioridade === 'media').length,
+            baixa: sugestoes.filter(s => s.prioridade === 'baixa').length
+          }
+        }
+      });
+
+    } catch (error) {
+      logger.error('Erro ao gerar sugestões de otimização:', error);
       res.status(500).json({
         success: false,
         message: 'Erro interno do servidor'

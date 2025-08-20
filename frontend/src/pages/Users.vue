@@ -630,10 +630,11 @@ tr:last-child td {
   background: white;
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-  width: 90%;
-  max-width: 800px;
-  max-height: 90vh;
-  overflow-y: auto;
+  width: 95%;
+  max-width: 600px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
   position: relative;
 }
 
@@ -677,7 +678,10 @@ tr:last-child td {
 }
 
 .modal-body {
-  padding: 2rem;
+  padding: 1.5rem 2rem 2rem;
+  overflow-y: auto;
+  flex: 1;
+  max-height: calc(85vh - 120px);
 }
 
 .form-grid {

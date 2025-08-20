@@ -1,6 +1,7 @@
 const { Ativo, Category, SubCategory, Department, User, Setor } = require('../models');
 const { Op } = require('sequelize');
 const logger = require('../config/logger');
+const QRCodeService = require('../services/QRCodeService');
 
 class AtivoController {
   // Listar ativos com paginação e filtros
@@ -207,6 +208,16 @@ class AtivoController {
         ativo_id: ativo.id,
         user_id: req.user?.id
       });
+
+      // Gerar QR code para o ativo
+      try {
+        const qrCodeUrl = await QRCodeService.generateAtivoQRCode(ativo);
+        await ativo.update({ qr_code: qrCodeUrl });
+        ativo.qr_code = qrCodeUrl;
+      } catch (qrError) {
+        logger.warn('Erro ao gerar QR code para ativo:', qrError);
+        // Não falhar a criação do ativo por causa do QR code
+      }
 
       res.status(201).json({
         success: true,
@@ -441,6 +452,233 @@ class AtivoController {
 
     } catch (error) {
       logger.error('Erro ao listar ativos para seleção:', error);
+      next(error);
+    }
+  }
+
+  // Regenerar QR code para um ativo
+  async regenerateQRCode(req, res, next) {
+    try {
+      const { id } = req.params;
+
+      const ativo = await Ativo.findByPk(id, {
+        include: [
+          { model: Category, as: 'categoria', attributes: ['id', 'nome'] },
+          { model: Setor, as: 'setor', attributes: ['id', 'nome'] }
+        ]
+      });
+
+      if (!ativo) {
+        return res.status(404).json({
+          success: false,
+          message: 'Ativo não encontrado'
+        });
+      }
+
+      // Remover QR code antigo se existir
+      if (ativo.qr_code) {
+        await QRCodeService.removeOldQRCode(ativo.qr_code);
+      }
+
+      // Gerar novo QR code
+      const qrCodeUrl = await QRCodeService.generateAtivoQRCode(ativo);
+      await ativo.update({ qr_code: qrCodeUrl });
+
+      logger.info(`QR code regenerado para ativo ${ativo.codigo_patrimonio}`, {
+        ativo_id: id,
+        user_id: req.user?.id
+      });
+
+      res.json({
+        success: true,
+        message: 'QR code regenerado com sucesso',
+        data: { qr_code: qrCodeUrl }
+      });
+
+    } catch (error) {
+      logger.error('Erro ao regenerar QR code:', error);
+      next(error);
+    }
+  }
+
+  // Calcular métricas de manutenção para um ativo
+  async calculateMaintenanceMetrics(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { OrdemServico } = require('../models');
+
+      const ativo = await Ativo.findByPk(id);
+      if (!ativo) {
+        return res.status(404).json({
+          success: false,
+          message: 'Ativo não encontrado'
+        });
+      }
+
+      // Buscar histórico de ordens de serviço
+      const ordensServico = await OrdemServico.findAll({
+        where: { 
+          ativo_id: id,
+          status: 'concluida'
+        },
+        order: [['data_fim_real', 'ASC']]
+      });
+
+      let mtbf = null;
+      let mttr = null;
+      let custoTotal = 0;
+      let tempoParadaTotal = 0;
+
+      if (ordensServico.length > 0) {
+        // Calcular MTTR (Mean Time To Repair)
+        const temposReparo = ordensServico
+          .filter(os => os.data_inicio_real && os.data_fim_real)
+          .map(os => {
+            const inicio = new Date(os.data_inicio_real);
+            const fim = new Date(os.data_fim_real);
+            return (fim - inicio) / (1000 * 60 * 60); // em horas
+          });
+
+        if (temposReparo.length > 0) {
+          mttr = temposReparo.reduce((acc, tempo) => acc + tempo, 0) / temposReparo.length;
+          tempoParadaTotal = temposReparo.reduce((acc, tempo) => acc + tempo, 0);
+        }
+
+        // Calcular MTBF (Mean Time Between Failures) - apenas para OS corretivas
+        const osCorretivas = ordensServico.filter(os => os.tipo === 'corretiva');
+        if (osCorretivas.length > 1) {
+          const intervalos = [];
+          for (let i = 1; i < osCorretivas.length; i++) {
+            const anterior = new Date(osCorretivas[i-1].data_fim_real);
+            const atual = new Date(osCorretivas[i].data_inicio_real);
+            const intervalo = (atual - anterior) / (1000 * 60 * 60); // em horas
+            intervalos.push(intervalo);
+          }
+          mtbf = intervalos.reduce((acc, int) => acc + int, 0) / intervalos.length;
+        }
+
+        // Calcular custo total
+        custoTotal = ordensServico.reduce((acc, os) => acc + parseFloat(os.custo_total || 0), 0);
+      }
+
+      // Calcular disponibilidade (assumindo 24h/dia operação)
+      const diasOperacao = 365; // último ano
+      const horasDisponiveis = diasOperacao * 24;
+      const disponibilidade = horasDisponiveis > 0 ? 
+        ((horasDisponiveis - tempoParadaTotal) / horasDisponiveis) * 100 : 100;
+
+      // Atualizar ativo com as métricas
+      await ativo.update({
+        mtbf_horas: mtbf,
+        mttr_horas: mttr,
+        custo_manutencao_total: custoTotal
+      });
+
+      const metricas = {
+        mtbf_horas: mtbf,
+        mttr_horas: mttr,
+        custo_total: custoTotal,
+        tempo_parada_total: tempoParadaTotal,
+        disponibilidade_percentual: Math.round(disponibilidade * 100) / 100,
+        total_ordens_servico: ordensServico.length,
+        ordens_corretivas: ordensServico.filter(os => os.tipo === 'corretiva').length,
+        ordens_preventivas: ordensServico.filter(os => os.tipo === 'preventiva').length
+      };
+
+      res.json({
+        success: true,
+        data: { metricas }
+      });
+
+    } catch (error) {
+      logger.error('Erro ao calcular métricas de manutenção:', error);
+      next(error);
+    }
+  }
+
+  // Atualizar parâmetros de operação
+  async updateOperationParameters(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { parametros } = req.body;
+
+      const ativo = await Ativo.findByPk(id);
+      if (!ativo) {
+        return res.status(404).json({
+          success: false,
+          message: 'Ativo não encontrado'
+        });
+      }
+
+      await ativo.update({
+        parametros_operacao: parametros
+      });
+
+      logger.info(`Parâmetros de operação atualizados para ativo ${ativo.codigo_patrimonio}`, {
+        ativo_id: id,
+        user_id: req.user?.id
+      });
+
+      res.json({
+        success: true,
+        message: 'Parâmetros de operação atualizados com sucesso'
+      });
+
+    } catch (error) {
+      logger.error('Erro ao atualizar parâmetros de operação:', error);
+      next(error);
+    }
+  }
+
+  // Adicionar entrada no histórico de falhas
+  async addFailureRecord(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { descricao, data_ocorrencia, causa, solucao, tempo_parada_horas } = req.body;
+
+      const ativo = await Ativo.findByPk(id);
+      if (!ativo) {
+        return res.status(404).json({
+          success: false,
+          message: 'Ativo não encontrado'
+        });
+      }
+
+      // Obter histórico atual
+      const historicoAtual = ativo.historico_falhas || [];
+
+      // Adicionar nova entrada
+      const novaEntrada = {
+        id: Date.now(),
+        descricao,
+        data_ocorrencia: data_ocorrencia || new Date(),
+        causa,
+        solucao,
+        tempo_parada_horas: parseFloat(tempo_parada_horas || 0),
+        registrado_por: req.user?.id,
+        registrado_em: new Date()
+      };
+
+      historicoAtual.push(novaEntrada);
+
+      await ativo.update({
+        historico_falhas: historicoAtual
+      });
+
+      logger.info(`Falha registrada para ativo ${ativo.codigo_patrimonio}`, {
+        ativo_id: id,
+        falha_id: novaEntrada.id,
+        user_id: req.user?.id
+      });
+
+      res.json({
+        success: true,
+        message: 'Falha registrada com sucesso',
+        data: { falha: novaEntrada }
+      });
+
+    } catch (error) {
+      logger.error('Erro ao registrar falha:', error);
       next(error);
     }
   }

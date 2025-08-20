@@ -4,7 +4,6 @@
     <nav v-if="authStore.isAuthenticated" class="navbar">
       <div class="navbar-brand">
         <router-link to="/dashboard" class="brand-link">
-          <span class="brand-icon">⚙️</span>
           <span class="brand-text">UpKeep Pró 1.0</span>
         </router-link>
       </div>
@@ -12,15 +11,20 @@
       <div class="navbar-menu">
         <router-link to="/dashboard" class="nav-link">Dashboard</router-link>
         <router-link to="/solicitacoes" class="nav-link">Solicitações</router-link>
+        <router-link v-if="authStore.hasRole('tecnico')" to="/ordens-servico" class="nav-link">Ordens de Serviço</router-link>
         <router-link to="/ativos" class="nav-link">Ativos</router-link>
         <router-link v-if="authStore.hasRole('tecnico')" to="/setores" class="nav-link">Setores</router-link>
         <router-link v-if="authStore.hasRole('tecnico')" to="/preventiva" class="nav-link">Preventiva</router-link>
         <router-link v-if="authStore.hasRole('tecnico')" to="/estoque" class="nav-link">Estoque</router-link>
+        <router-link v-if="authStore.hasRole('tecnico')" to="/workflows" class="nav-link">Workflows</router-link>
         <router-link v-if="authStore.hasRole('supervisor')" to="/users" class="nav-link">Usuários</router-link>
         <router-link to="/departments" class="nav-link">Departamentos</router-link>
         <router-link v-if="authStore.hasRole('supervisor')" to="/permissions" class="nav-link">Permissões</router-link>
         <router-link to="/profile" class="nav-link">Perfil</router-link>
-        <button @click="handleLogout" class="nav-button">Sair</button>
+        <button @click="handleLogout" class="nav-button logout-button">
+          <i class="fas fa-sign-out-alt"></i>
+          Sair
+        </button>
       </div>
       
       <div class="navbar-user">
@@ -142,6 +146,13 @@ const handleLogout = () => {
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
 }
 
+.brand-logo {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
 .brand-text {
   letter-spacing: 0.5px;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -174,11 +185,26 @@ const handleLogout = () => {
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .nav-button:hover {
   background: rgba(255,255,255,0.1);
   border-color: rgba(255,255,255,0.5);
+}
+
+.logout-button {
+  background: rgba(220, 53, 69, 0.1);
+  border-color: rgba(220, 53, 69, 0.3);
+  color: #ff6b7a;
+}
+
+.logout-button:hover {
+  background: rgba(220, 53, 69, 0.2);
+  border-color: rgba(220, 53, 69, 0.5);
+  color: #fff;
 }
 
 .navbar-user {

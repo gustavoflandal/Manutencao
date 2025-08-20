@@ -14,6 +14,7 @@
   "dependencies": {
     "@vueuse/core": "^10.3.0",
     "axios": "^1.4.0",
+    "lodash-es": "^4.17.21",
     "lucide-vue-next": "^0.540.0",
     "pinia": "^2.1.6",
     "vue": "^3.3.4",

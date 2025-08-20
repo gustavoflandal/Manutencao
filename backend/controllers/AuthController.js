@@ -343,6 +343,130 @@ class AuthController {
       next(error);
     }
   }
+
+  // Registro público de usuários
+  async publicRegister(req, res, next) {
+    try {
+      const { nome, email, senha } = req.body;
+
+      // Validação básica
+      if (!nome || !email || !senha) {
+        return res.status(400).json({
+          success: false,
+          message: 'Nome, email e senha são obrigatórios'
+        });
+      }
+
+      if (senha.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: 'A senha deve ter pelo menos 6 caracteres'
+        });
+      }
+
+      // Validação de formato de email
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Formato de email inválido'
+        });
+      }
+
+      // Verificar se email já existe
+      const existingUser = await User.findOne({
+        where: { email: email.toLowerCase() }
+      });
+
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'Este email já está em uso'
+        });
+      }
+
+      // Criar usuário com perfil de solicitante
+      const userData = {
+        nome: nome.trim(),
+        email: email.toLowerCase().trim(),
+        senha,
+        perfil: 'solicitante',
+        ativo: true
+      };
+
+      const user = await User.create(userData);
+
+      logger.info(`Usuário registrado publicamente: ${user.email}`, {
+        userId: user.id,
+        perfil: user.perfil
+      });
+
+      res.status(201).json({
+        success: true,
+        message: 'Conta criada com sucesso! Você pode fazer login agora.',
+        data: {
+          user: {
+            id: user.id,
+            nome: user.nome,
+            email: user.email,
+            perfil: user.perfil
+          }
+        }
+      });
+
+    } catch (error) {
+      logger.error('Erro no registro público:', error);
+      next(error);
+    }
+  }
+
+  // Recuperação de senha
+  async forgotPassword(req, res, next) {
+    try {
+      const { email } = req.body;
+
+      // Validação básica
+      if (!email) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email é obrigatório'
+        });
+      }
+
+      // Buscar usuário pelo email
+      const user = await User.findOne({
+        where: { email: email.toLowerCase() }
+      });
+
+      // Por segurança, sempre retornar sucesso, mesmo se o email não existir
+      if (!user) {
+        logger.warn(`Tentativa de recuperação de senha para email inexistente: ${email}`);
+        return res.json({
+          success: true,
+          message: 'Se o email existir em nossa base de dados, você receberá instruções para recuperar sua senha.'
+        });
+      }
+
+      // TODO: Implementar envio de email com token de recuperação
+      // Por enquanto, apenas simular o processo
+      logger.info(`Solicitação de recuperação de senha: ${user.email}`, {
+        userId: user.id,
+        ip: req.ip
+      });
+
+      // Simular delay de envio de email
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      res.json({
+        success: true,
+        message: 'Se o email existir em nossa base de dados, você receberá instruções para recuperar sua senha.'
+      });
+
+    } catch (error) {
+      logger.error('Erro na recuperação de senha:', error);
+      next(error);
+    }
+  }
 }
 
 module.exports = new AuthController();

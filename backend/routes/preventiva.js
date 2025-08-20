@@ -25,6 +25,18 @@ router.get('/calendario',
   PlanoPreventivosController.calendario
 );
 
+// Relatório de eficiência da manutenção preventiva
+router.get('/relatorio/eficiencia', 
+  requireRole('supervisor'),
+  PlanoPreventivosController.relatorioEficiencia
+);
+
+// Sugerir otimizações nos planos preventivos
+router.get('/otimizacoes/sugestoes', 
+  requireRole('supervisor'),
+  PlanoPreventivosController.sugerirOtimizacoes
+);
+
 // Obter planos por status de vencimento
 router.get('/status/:status', 
   requireRole('tecnico'),
@@ -41,6 +53,18 @@ router.get('/:id',
 router.post('/', 
   requireRole('tecnico'),
   PlanoPreventivosController.store
+);
+
+// Gerar ordens de serviço automaticamente para planos vencidos
+router.post('/gerar-ordens-automaticas', 
+  requireRole('tecnico'),
+  PlanoPreventivosController.gerarOrdensAutomaticas
+);
+
+// Atualizar planos baseados em métricas (horas/contador)
+router.post('/atualizar-metricas', 
+  requireRole('tecnico'),
+  PlanoPreventivosController.atualizarPlanosMetricas
 );
 
 // Atualizar plano preventivo

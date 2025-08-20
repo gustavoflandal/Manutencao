@@ -12,8 +12,33 @@ fs
     return (file.indexOf('.') !== 0) && (file !== 'index.js') && (file.slice(-3) === '.js');
   })
   .forEach(file => {
-    const model = require(path.join(__dirname, file))(sequelize, Sequelize.DataTypes);
-    db[model.name] = model;
+    try {
+      const modelExport = require(path.join(__dirname, file));
+      let model;
+      
+      // Verifica se é uma função factory ou um modelo já definido
+      if (typeof modelExport === 'function') {
+        // É uma função factory (padrão antigo)
+        try {
+          model = modelExport(sequelize, Sequelize.DataTypes);
+        } catch (err) {
+          console.log(`Tentando carregar ${file} como modelo direto...`);
+          model = modelExport;
+        }
+      } else if (modelExport && modelExport.name) {
+        // É um modelo já definido (padrão novo dos workflows)
+        model = modelExport;
+      }
+      
+      if (model && model.name) {
+        db[model.name] = model;
+        console.log(`✅ Modelo ${model.name} carregado de ${file}`);
+      } else {
+        console.log(`⚠️ Modelo em ${file} não pôde ser carregado`);
+      }
+    } catch (error) {
+      console.error(`❌ Erro ao carregar modelo ${file}:`, error.message);
+    }
   });
 
 // Configura associações entre modelos
@@ -70,44 +95,8 @@ if (db.User && db.Department) {
   });
 }
 
-// Associações para Solicitacao
-if (db.Solicitacao && db.User && db.Department) {
-  // Solicitação pertence a um solicitante (usuário)
-  db.Solicitacao.belongsTo(db.User, {
-    foreignKey: 'solicitante_id',
-    as: 'solicitante'
-  });
-
-  // Solicitação pode ter um responsável (usuário)
-  db.Solicitacao.belongsTo(db.User, {
-    foreignKey: 'responsavel_id',
-    as: 'responsavel'
-  });
-
-  // Solicitação pode pertencer a um departamento
-  db.Solicitacao.belongsTo(db.Department, {
-    foreignKey: 'department_id',
-    as: 'department'
-  });
-
-  // Usuário pode ter muitas solicitações criadas
-  db.User.hasMany(db.Solicitacao, {
-    foreignKey: 'solicitante_id',
-    as: 'solicitacoesCriadas'
-  });
-
-  // Usuário pode ser responsável por muitas solicitações
-  db.User.hasMany(db.Solicitacao, {
-    foreignKey: 'responsavel_id',
-    as: 'solicitacoesResponsavel'
-  });
-
-  // Departamento pode ter muitas solicitações
-  db.Department.hasMany(db.Solicitacao, {
-    foreignKey: 'department_id',
-    as: 'solicitacoes'
-  });
-}
+// Associações para Solicitacao - removidas para evitar duplicação
+// As associações estão definidas nos modelos individuais através do método associate
 
 // Associações para Category e SubCategory
 if (db.Category && db.SubCategory && db.Solicitacao) {
@@ -122,27 +111,118 @@ if (db.Category && db.SubCategory && db.Solicitacao) {
     as: 'categoria'
   });
 
-    // Category -> Solicitacao
-  db.Category.hasMany(db.Solicitacao, {
-    foreignKey: 'category_id',
-    as: 'solicitacoes'
-  });
+    // Category -> Solicitacao (apenas se não foi definida no modelo)
+  if (!db.Category.associations.solicitacoes) {
+    db.Category.hasMany(db.Solicitacao, {
+      foreignKey: 'category_id',
+      as: 'solicitacoes'
+    });
+  }
 
-  db.Solicitacao.belongsTo(db.Category, {
-    foreignKey: 'category_id',
-    as: 'categoriaObj'  // Mudando o alias para evitar conflito
-  });
+  // SubCategory -> Solicitacao (apenas se não foi definida no modelo)  
+  if (!db.SubCategory.associations.solicitacoes) {
+    db.SubCategory.hasMany(db.Solicitacao, {
+      foreignKey: 'subcategory_id',
+      as: 'solicitacoes'
+    });
+  }
+}
 
-  // SubCategory -> Solicitacao
-  db.SubCategory.hasMany(db.Solicitacao, {
-    foreignKey: 'subcategory_id',
-    as: 'solicitacoes'
-  });
+// Associações para Notificacao
+if (db.Notificacao && db.User) {
+  // As associações já são definidas no modelo Notificacao.js através do método associate
+  // Não precisamos redefini-las aqui para evitar conflitos
+}
 
-  db.Solicitacao.belongsTo(db.SubCategory, {
-    foreignKey: 'subcategory_id',
-    as: 'subcategoriaObj'  // Mudando o alias para evitar conflito
-  });
+// Associações para ConfiguracaoNotificacao
+if (db.ConfiguracaoNotificacao && db.User) {
+  // As associações já são definidas no modelo ConfiguracaoNotificacao.js através do método associate
+  // Não precisamos redefini-las aqui para evitar conflitos
+}
+
+// Associações para Workflow
+if (db.Workflow && db.User && db.Setor && db.WorkflowInstancia) {
+  // As associações já são definidas nos modelos através do método associate
+  // Verificar se existem antes de criar para evitar conflitos
+  if (!db.Workflow.associations.criador) {
+    db.Workflow.belongsTo(db.User, {
+      foreignKey: 'user_id',
+      as: 'criador'
+    });
+  }
+
+  if (!db.Workflow.associations.setor) {
+    db.Workflow.belongsTo(db.Setor, {
+      foreignKey: 'setor_id',
+      as: 'setor'
+    });
+  }
+
+  if (!db.Workflow.associations.instancias) {
+    db.Workflow.hasMany(db.WorkflowInstancia, {
+      foreignKey: 'workflow_id',
+      as: 'instancias'
+    });
+  }
+}
+
+// Associações para WorkflowInstancia
+if (db.WorkflowInstancia && db.Workflow && db.User && db.WorkflowAcao) {
+  // As associações já são definidas nos modelos através do método associate
+  // Verificar se existem antes de criar para evitar conflitos
+  if (!db.WorkflowInstancia.associations.workflow) {
+    db.WorkflowInstancia.belongsTo(db.Workflow, {
+      foreignKey: 'workflow_id',
+      as: 'workflow'
+    });
+  }
+
+  if (!db.WorkflowInstancia.associations.iniciador) {
+    db.WorkflowInstancia.belongsTo(db.User, {
+      foreignKey: 'user_iniciador_id',
+      as: 'iniciador'
+    });
+  }
+
+  if (!db.WorkflowInstancia.associations.responsavel) {
+    db.WorkflowInstancia.belongsTo(db.User, {
+      foreignKey: 'user_responsavel_id',
+      as: 'responsavel'
+    });
+  }
+
+  if (!db.WorkflowInstancia.associations.aprovador_atual) {
+    db.WorkflowInstancia.belongsTo(db.User, {
+      foreignKey: 'aprovador_atual_id',
+      as: 'aprovador_atual'
+    });
+  }
+
+  if (!db.WorkflowInstancia.associations.acoes) {
+    db.WorkflowInstancia.hasMany(db.WorkflowAcao, {
+      foreignKey: 'instancia_id',
+      as: 'acoes'
+    });
+  }
+}
+
+// Associações para WorkflowAcao
+if (db.WorkflowAcao && db.WorkflowInstancia && db.User) {
+  // As associações já são definidas nos modelos através do método associate
+  // Verificar se existem antes de criar para evitar conflitos
+  if (!db.WorkflowAcao.associations.instancia) {
+    db.WorkflowAcao.belongsTo(db.WorkflowInstancia, {
+      foreignKey: 'instancia_id',
+      as: 'instancia'
+    });
+  }
+
+  if (!db.WorkflowAcao.associations.usuario) {
+    db.WorkflowAcao.belongsTo(db.User, {
+      foreignKey: 'user_id',
+      as: 'usuario'
+    });
+  }
 }
 
 db.sequelize = sequelize;

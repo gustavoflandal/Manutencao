@@ -20,7 +20,11 @@
           <span class="stats-number" :class="{ 'loading': carregando }">
             {{ carregando ? '...' : stats.total }}
           </span>
-          <span class="stats-label">Cadastrados</span>
+          <span class="stats-label">Cad  width: 95%;
+  max-width: 600px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;ados</span>
         </div>
       </div>
 

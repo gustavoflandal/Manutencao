@@ -27,4 +27,10 @@ router.put('/:id', requireRole('tecnico'), AtivoController.update);
 // Rotas que requerem permissão de exclusão (supervisor ou superior)
 router.delete('/:id', requireRole('supervisor'), AtivoController.destroy);
 
+// Rotas especializadas para manutenção avançada
+router.post('/:id/qrcode', requireRole('tecnico'), AtivoController.regenerateQRCode);
+router.get('/:id/metrics', AtivoController.calculateMaintenanceMetrics);
+router.put('/:id/parameters', requireRole('tecnico'), AtivoController.updateOperationParameters);
+router.post('/:id/failures', requireRole('tecnico'), AtivoController.addFailureRecord);
+
 module.exports = router;

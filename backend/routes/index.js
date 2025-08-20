@@ -14,8 +14,12 @@ const ativoRoutes = require('./ativos');
 const setorRoutes = require('./setores');
 const estoqueRoutes = require('./estoque');
 const preventivaRoutes = require('./preventiva');
+const agendamentoRoutes = require('./agendamento');
 const relatorioRoutes = require('./relatorios');
 const uploadRoutes = require('./upload');
+const notificacaoRoutes = require('./notificacoes');
+const analyticsRoutes = require('./analytics');
+const workflowRoutes = require('./workflows');
 
 // Registrar rotas
 router.use('/auth', authRoutes);
@@ -30,8 +34,12 @@ router.use('/ativos', ativoRoutes);
 router.use('/setores', setorRoutes);
 router.use('/estoque', estoqueRoutes);
 router.use('/preventiva', preventivaRoutes);
+router.use('/agendamento', agendamentoRoutes);
 router.use('/relatorios', relatorioRoutes);
 router.use('/upload', uploadRoutes);
+router.use('/notificacoes', notificacaoRoutes);
+router.use('/analytics', analyticsRoutes);
+router.use('/workflows', workflowRoutes);
 
 // Rota de health check
 router.get('/health', (req, res) => {

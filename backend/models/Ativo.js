@@ -63,6 +63,9 @@ module.exports = (sequelize) => {
       type: DataTypes.DECIMAL(15, 2),
       defaultValue: 0.00,
       validate: {
+        isDecimal: {
+          msg: 'Valor de aquisição deve ser um número decimal válido'
+        },
         min: {
           args: [0],
           msg: 'Valor de aquisição não pode ser negativo'
@@ -73,6 +76,9 @@ module.exports = (sequelize) => {
       type: DataTypes.DECIMAL(15, 2),
       defaultValue: 0.00,
       validate: {
+        isDecimal: {
+          msg: 'Valor atual deve ser um número decimal válido'
+        },
         min: {
           args: [0],
           msg: 'Valor atual não pode ser negativo'
@@ -210,9 +216,8 @@ module.exports = (sequelize) => {
       type: DataTypes.DECIMAL(12, 2),
       defaultValue: 0.00,
       validate: {
-        min: {
-          args: [0],
-          msg: 'Horas de funcionamento não pode ser negativo'
+        isDecimal: {
+          msg: 'Horas de funcionamento deve ser um número decimal válido'
         }
       }
     },
@@ -220,9 +225,8 @@ module.exports = (sequelize) => {
       type: DataTypes.INTEGER,
       defaultValue: 0,
       validate: {
-        min: {
-          args: [0],
-          msg: 'Contador de produção não pode ser negativo'
+        isInt: {
+          msg: 'Contador de produção deve ser um número inteiro'
         }
       }
     },
@@ -230,6 +234,70 @@ module.exports = (sequelize) => {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
       allowNull: false
+    },
+    // Campos avançados para manutenção industrial
+    vida_util_anos: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      validate: {
+        min: {
+          args: [1],
+          msg: 'Vida útil deve ser maior que zero'
+        }
+      }
+    },
+    ultima_manutencao: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    proxima_manutencao: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    intervalo_manutencao_dias: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      validate: {
+        min: {
+          args: [1],
+          msg: 'Intervalo de manutenção deve ser maior que zero'
+        }
+      }
+    },
+    custo_manutencao_total: {
+      type: DataTypes.DECIMAL(15, 2),
+      defaultValue: 0.00,
+      validate: {
+        min: {
+          args: [0],
+          msg: 'Custo de manutenção não pode ser negativo'
+        }
+      }
+    },
+    mtbf_horas: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true,
+      comment: 'Mean Time Between Failures em horas'
+    },
+    mttr_horas: {
+      type: DataTypes.DECIMAL(8, 2),
+      allowNull: true,
+      comment: 'Mean Time To Repair em horas'
+    },
+    historico_falhas: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: 'Histórico de falhas e reparos'
+    },
+    parametros_operacao: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: 'Parâmetros normais de operação (temperatura, pressão, etc.)'
+    },
+    documentos_anexos: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      comment: 'Links para manuais, certificados e documentos'
     }
   }, {
     tableName: 'ativos',
@@ -311,11 +379,8 @@ module.exports = (sequelize) => {
       as: 'ordens_servico'
     });
 
-    // Associação com solicitações
-    Ativo.hasMany(models.Solicitacao, {
-      foreignKey: 'ativo_id',
-      as: 'solicitacoes'
-    });
+    // Nota: Solicitações não têm referência direta a ativo_id
+    // A relação com ativos deve ser feita através de ordens de serviço
   };
 
   // Métodos da instância

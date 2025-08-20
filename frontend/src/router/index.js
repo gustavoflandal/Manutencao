@@ -3,6 +3,8 @@ import { useAuthStore } from '@/stores/auth'
 
 // Componentes de páginas
 import Login from '@/pages/Login.vue'
+import ForgotPassword from '@/pages/ForgotPassword.vue'
+import Register from '@/pages/Register.vue'
 import Dashboard from '@/pages/Dashboard.vue'
 import Users from '@/pages/Users.vue'
 import UserForm from '@/pages/UserForm.vue'
@@ -17,8 +19,12 @@ import Categories from '@/pages/Categories.vue'
 import SubCategories from '@/pages/SubCategories.vue'
 import Ativos from '@/pages/Ativos.vue'
 import Setores from '@/pages/Setores.vue'
+import OrdensServico from '@/pages/OrdensServico.vue'
 import Preventiva from '@/pages/Preventiva.vue'
 import Estoque from '@/pages/Estoque.vue'
+import Workflows from '@/pages/Workflows.vue'
+import WorkflowTemplates from '@/pages/WorkflowTemplates.vue'
+import WorkflowDetail from '@/pages/WorkflowDetail.vue'
 
 const routes = [
   {
@@ -32,6 +38,18 @@ const routes = [
     path: '/login',
     name: 'Login',
     component: Login,
+    meta: { requiresGuest: true }
+  },
+  {
+    path: '/forgot-password',
+    name: 'ForgotPassword',
+    component: ForgotPassword,
+    meta: { requiresGuest: true }
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: Register,
     meta: { requiresGuest: true }
   },
   {
@@ -125,6 +143,12 @@ const routes = [
     meta: { requiresAuth: true }
   },
   {
+    path: '/ordens-servico',
+    name: 'OrdensServico',
+    component: OrdensServico,
+    meta: { requiresAuth: true, requiresRole: 'tecnico' }
+  },
+  {
     path: '/setores',
     name: 'Setores',
     component: Setores,
@@ -142,6 +166,63 @@ const routes = [
     component: Estoque,
     meta: { requiresAuth: true, requiresRole: 'tecnico' }
   },
+  {
+    path: '/workflows',
+    name: 'Workflows',
+    component: Workflows,
+    meta: { requiresAuth: true, requiresRole: 'tecnico' }
+  },
+  {
+    path: '/workflows/templates',
+    name: 'WorkflowTemplates',
+    component: WorkflowTemplates,
+    meta: { requiresAuth: true, requiresRole: 'tecnico' }
+  },
+  {
+    path: '/workflows/instances',
+    name: 'WorkflowInstances',
+    component: () => import('@/pages/WorkflowInstances.vue'),
+    meta: { 
+      requiresAuth: true,
+      requiredRole: 'tecnico'
+    }
+  },
+  {
+    path: '/workflows/instances/:id',
+    name: 'WorkflowInstanceDetail',
+    component: () => import('@/pages/WorkflowDetail.vue'),
+    meta: { 
+      requiresAuth: true,
+      requiredRole: 'tecnico'
+    }
+  },
+  {
+      path: '/workflows/create',
+      name: 'WorkflowCreate',
+      component: () => import('@/pages/WorkflowForm.vue'),
+      meta: { 
+        requiresAuth: true,
+        requiredRole: 'tecnico'
+      }
+    },
+    {
+      path: '/workflows/:id/edit',
+      name: 'WorkflowEdit',
+      component: () => import('@/pages/WorkflowForm.vue'),
+      meta: { 
+        requiresAuth: true,
+        requiredRole: 'tecnico'
+      }
+    },
+    {
+      path: '/workflows/:id',
+      name: 'WorkflowDetail',
+      component: () => import('@/pages/WorkflowDetail.vue'),
+      meta: { 
+        requiresAuth: true,
+        requiredRole: 'tecnico'
+      }
+    },
   {
     path: '/profile',
     name: 'Profile',

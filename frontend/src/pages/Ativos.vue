@@ -787,10 +787,11 @@ tr:last-child td {
 .modal-container {
   background: var(--color-white);
   border-radius: var(--border-radius-lg);
-  width: 90%;
-  max-width: 800px;
-  max-height: 90vh;
-  overflow-y: auto;
+  width: 95%;
+  max-width: 700px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: var(--shadow-xl);
 }
 

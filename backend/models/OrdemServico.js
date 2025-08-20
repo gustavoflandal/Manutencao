@@ -12,12 +12,45 @@ module.exports = (sequelize) => {
       unique: true,
       allowNull: false
     },
+    ativo_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'ativos',
+        key: 'id'
+      }
+    },
+    solicitacao_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'solicitacoes',
+        key: 'id'
+      }
+    },
+    solicitante_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'users',
+        key: 'id'
+      }
+    },
+    responsavel_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id'
+      }
+    },
     tipo: {
       type: DataTypes.ENUM('corretiva', 'preventiva', 'preditiva', 'melhoria'),
       allowNull: false
     },
     descricao_servico: {
-      type: DataTypes.TEXT
+      type: DataTypes.TEXT,
+      allowNull: false
     },
     status: {
       type: DataTypes.ENUM('planejada', 'em_execucao', 'pausada', 'concluida', 'cancelada'),
@@ -72,13 +105,30 @@ module.exports = (sequelize) => {
         min: 1,
         max: 5
       }
+    },
+    materiais_utilizados: {
+      type: DataTypes.JSON,
+      comment: 'Array de materiais utilizados na OS'
+    },
+    fotos_antes: {
+      type: DataTypes.JSON,
+      comment: 'Array de URLs das fotos antes do serviço'
+    },
+    fotos_depois: {
+      type: DataTypes.JSON,
+      comment: 'Array de URLs das fotos depois do serviço'
+    },
+    checklist: {
+      type: DataTypes.JSON,
+      comment: 'Checklist de atividades da OS'
     }
   }, {
     tableName: 'ordens_servico',
     hooks: {
       beforeCreate: async (os) => {
         const count = await OrdemServico.count();
-        os.numero_os = `OS${String(count + 1).padStart(6, '0')}`;
+        const year = new Date().getFullYear();
+        os.numero_os = `OS-${year}-${String(count + 1).padStart(6, '0')}`;
       },
       beforeSave: (os) => {
         // Calcular custo total automaticamente
@@ -88,6 +138,29 @@ module.exports = (sequelize) => {
       }
     }
   });
+
+  // Definir associações
+  OrdemServico.associate = (models) => {
+    OrdemServico.belongsTo(models.Ativo, {
+      foreignKey: 'ativo_id',
+      as: 'ativo'
+    });
+
+    OrdemServico.belongsTo(models.Solicitacao, {
+      foreignKey: 'solicitacao_id',
+      as: 'solicitacao'
+    });
+
+    OrdemServico.belongsTo(models.User, {
+      foreignKey: 'solicitante_id',
+      as: 'solicitante'
+    });
+
+    OrdemServico.belongsTo(models.User, {
+      foreignKey: 'responsavel_id',
+      as: 'responsavel'
+    });
+  };
 
   return OrdemServico;
 };
