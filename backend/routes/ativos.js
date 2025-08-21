@@ -24,6 +24,12 @@ router.post('/', requireRole('tecnico'), AtivoController.store);
 // Rotas que requerem permissão de edição (técnico ou superior)
 router.put('/:id', requireRole('tecnico'), AtivoController.update);
 
+// Rotas de imagens
+router.post('/:id/imagens', requireRole('tecnico'), AtivoController.uploadImagens);
+router.get('/:id/imagens', AtivoController.listarImagens);
+router.delete('/:id/imagens/:imagemId', requireRole('tecnico'), AtivoController.removerImagem);
+router.put('/:id/imagens/:imagemId/ordem', requireRole('tecnico'), AtivoController.atualizarOrdemImagem);
+
 // Rotas que requerem permissão de exclusão (supervisor ou superior)
 router.delete('/:id', requireRole('supervisor'), AtivoController.destroy);
 

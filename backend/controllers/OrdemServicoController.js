@@ -4,19 +4,18 @@ const { Op } = require('sequelize');
 
 const OrdemServicoController = {
   // Listar todas as ordens de serviço com filtros e paginação
-  async index(req, res, next) {
+  async index(req, res) {
     try {
-      const { 
-        page = 1, 
-        limit = 20, 
-        status, 
-        tipo, 
-        prioridade, 
-        setor_id, 
+      const {
+        page = 1,
+        limit = 20,
+        status,
+        prioridade,
+        tipo,
+        search,
         responsavel_id,
-        data_inicio, 
-        data_fim,
-        search 
+        data_inicio,
+        data_fim
       } = req.query;
 
       const offset = (page - 1) * limit;
@@ -25,7 +24,7 @@ const OrdemServicoController = {
         {
           model: Ativo,
           as: 'ativo',
-          include: [{ model: Setor, as: 'setor' }]
+          attributes: ['id', 'nome', 'codigo_patrimonio', 'descricao']
         },
         {
           model: User,
@@ -46,20 +45,15 @@ const OrdemServicoController = {
 
       // Filtros
       if (status) where.status = status;
-      if (tipo) where.tipo = tipo;
       if (prioridade) where.prioridade = prioridade;
+      if (tipo) where.tipo = tipo;
       if (responsavel_id) where.responsavel_id = responsavel_id;
 
-      // Filtro por setor através do ativo
-      if (setor_id) {
-        include[0].where = { setor_id };
-      }
-
       // Filtro por período
-      if (data_inicio || data_fim) {
-        where.data_inicio_prevista = {};
-        if (data_inicio) where.data_inicio_prevista[Op.gte] = new Date(data_inicio);
-        if (data_fim) where.data_inicio_prevista[Op.lte] = new Date(data_fim);
+      if (data_inicio && data_fim) {
+        where.data_inicio_prevista = {
+          [Op.between]: [new Date(data_inicio), new Date(data_fim)]
+        };
       }
 
       // Busca textual
@@ -74,6 +68,12 @@ const OrdemServicoController = {
       const result = await OrdemServico.findAndCountAll({
         where,
         include,
+        attributes: [
+          'id', 'numero_os', 'tipo', 'descricao_servico', 'status', 'prioridade',
+          'data_inicio_prevista', 'data_inicio_real', 'data_fim_prevista', 'data_fim_real',
+          'horas_planejadas', 'horas_realizadas', 'custo_total', 'observacoes_execucao',
+          'ativo_id', 'solicitante_id', 'responsavel_id', 'created_at', 'updated_at'
+        ],
         limit: parseInt(limit),
         offset: parseInt(offset),
         order: [
@@ -89,18 +89,20 @@ const OrdemServicoController = {
       res.json({
         success: true,
         data: result.rows,
-        pagination: {
-          current_page: parseInt(page),
-          per_page: parseInt(limit),
-          total: result.count,
-          total_pages: Math.ceil(result.count / limit)
-        },
+        total: result.count,
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(result.count / limit),
+        limit: parseInt(limit),
         statistics: stats
       });
 
     } catch (error) {
       logger.error('Erro ao listar ordens de serviço:', error);
-      next(error);
+      res.status(500).json({
+        success: false,
+        message: 'Erro interno do servidor',
+        error: error.message
+      });
     }
   },
 
@@ -493,7 +495,7 @@ const OrdemServicoController = {
   // Relatório de produtividade
   async relatorioprodutividade(req, res, next) {
     try {
-      const { data_inicio, data_fim, responsavel_id, setor_id } = req.query;
+      const { data_inicio, data_fim, responsavel_id } = req.query;
 
       const where = {
         status: 'concluida'
@@ -510,13 +512,12 @@ const OrdemServicoController = {
       }
 
       const include = [
-        { model: Ativo, as: 'ativo' },
+        { 
+          model: Ativo, 
+          as: 'ativo'
+        },
         { model: User, as: 'responsavel', attributes: ['id', 'nome'] }
       ];
-
-      if (setor_id) {
-        include[0].where = { setor_id };
-      }
 
       const ossConcluidas = await OrdemServico.findAll({
         where,

@@ -21,6 +21,7 @@ const uploadRoutes = require('./upload');
 const notificacaoRoutes = require('./notificacoes');
 const analyticsRoutes = require('./analytics');
 const workflowRoutes = require('./workflows');
+const auditoriaRoutes = require('./auditoria');
 
 // Registrar rotas
 router.use('/auth', authRoutes);
@@ -42,6 +43,7 @@ router.use('/upload', uploadRoutes);
 router.use('/notificacoes', notificacaoRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/workflows', workflowRoutes);
+router.use('/auditoria', auditoriaRoutes);
 
 // Rota de health check
 router.get('/health', (req, res) => {

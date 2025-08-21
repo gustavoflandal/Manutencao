@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste CRUD Ativos - Frontend</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Teste CRUD de Ativos - Frontend</h1>
+
+    <form id="ativoForm">
+        <div class="form-group">
+            <label for="codigo_patrimonio">Código Patrimonial:</label>
+            <input type="text" id="codigo_patrimonio" name="codigo_patrimonio" required>
+        </div>
+
+        <div class="form-group">
+            <label for="nome">Nome do Ativo:</label>
+            <input type="text" id="nome" name="nome" required>
+        </div>
+
+        <div class="form-group">
+            <label for="estado">Estado:</label>
+            <select id="estado" name="estado" required>
+                <option value="">Selecione o estado</option>
+                <option value="operacional">Operacional</option>
+                <option value="manutencao">Em Manutenção</option>
+                <option value="parado">Parado</option>
+                <option value="descartado">Descartado</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="criticidade">Criticidade:</label>
+            <select id="criticidade" name="criticidade" required>
+                <option value="">Selecione a criticidade</option>
+                <option value="baixa">Baixa</option>
+                <option value="media">Média</option>
+                <option value="alta">Alta</option>
+                <option value="critica">Crítica</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="setor_id">Setor ID:</label>
+            <input type="number" id="setor_id" name="setor_id" value="9">
+        </div>
+
+        <div class="form-group">
+            <label for="localizacao_completa">Localização Completa:</label>
+            <input type="text" id="localizacao_completa" name="localizacao_completa" 
+                   placeholder="Ex: Setor A - Linha 1 - Posição 3">
+        </div>
+
+        <div class="form-group">
+            <label for="observacoes">Observações:</label>
+            <textarea id="observacoes" name="observacoes" rows="3" 
+                      placeholder="Observações e descrição detalhada do ativo..."></textarea>
+        </div>
+
+        <button type="submit">Criar Ativo</button>
+        <button type="button" onclick="listarAtivos()">Listar Ativos</button>
+        <button type="button" onclick="limparFormulario()">Limpar</button>
+    </form>
+
+    <div id="result" class="result" style="display: none;"></div>
+
+    <script>
+        let token = null;
+
+        // Fazer login automaticamente
+        async function login() {
+            try {
+                const response = await fetch('http://localhost:3001/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@sistema.com',
+                        senha: '123456'
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    token = data.data.accessToken;
+                    showResult('Login realizado com sucesso!', 'success');
+                    return true;
+                } else {
+                    showResult('Erro no login: ' + data.message, 'error');
+                    return false;
+                }
+            } catch (error) {
+                showResult('Erro no login: ' + error.message, 'error');
+                return false;
+            }
+        }
+
+        // Criar ativo
+        document.getElementById('ativoForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!token && !(await login())) {
+                return;
+            }
+
+            const formData = new FormData(e.target);
+            const ativoData = Object.fromEntries(formData.entries());
+
+            // Gerar código patrimonial único se não fornecido
+            if (!ativoData.codigo_patrimonio) {
+                ativoData.codigo_patrimonio = `TEST-${Date.now()}`;
+            }
+
+            showResult('Enviando dados do ativo...\n' + JSON.stringify(ativoData, null, 2), 'success');
+
+            try {
+                const response = await fetch('http://localhost:3001/api/ativos', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(ativoData)
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult('Ativo criado com sucesso!\n\n' + JSON.stringify(data.data.ativo, null, 2), 'success');
+                    limparFormulario();
+                } else {
+                    showResult('Erro ao criar ativo: ' + data.message, 'error');
+                }
+            } catch (error) {
+                showResult('Erro na requisição: ' + error.message, 'error');
+            }
+        });
+
+        // Listar ativos
+        async function listarAtivos() {
+            if (!token && !(await login())) {
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:3001/api/ativos', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    const ativos = data.data.ativos;
+                    showResult(`Ativos encontrados: ${ativos.length}\n\n` + 
+                              ativos.map(a => `ID: ${a.id} | ${a.codigo_patrimonio} | ${a.nome} | Loc: ${a.localizacao_completa || 'N/A'} | Obs: ${a.observacoes || 'N/A'}`).join('\n'), 'success');
+                } else {
+                    showResult('Erro ao listar ativos: ' + data.message, 'error');
+                }
+            } catch (error) {
+                showResult('Erro na requisição: ' + error.message, 'error');
+            }
+        }
+
+        // Limpar formulário
+        function limparFormulario() {
+            document.getElementById('ativoForm').reset();
+            document.getElementById('codigo_patrimonio').value = `TEST-${Date.now()}`;
+        }
+
+        // Mostrar resultado
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = `result ${type}`;
+            resultDiv.style.display = 'block';
+        }
+
+        // Inicializar com código patrimonial
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('codigo_patrimonio').value = `TEST-${Date.now()}`;
+        });
+    </script>
+</body>
+</html>

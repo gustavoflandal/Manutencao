@@ -73,7 +73,7 @@ class EstoqueController {
           as: 'itens',
           include: [
             { model: CategoriaEstoque, as: 'categoria' },
-            { model: Fornecedor, as: 'fornecedor' }
+            { model: Fornecedor, as: 'fornecedor_principal' }
           ]
         }]
       });
@@ -198,7 +198,7 @@ class EstoqueController {
         where,
         limit: parseInt(limit),
         offset: parseInt(offset),
-        order: [['nome', 'ASC']]
+        order: [['nome_fantasia', 'ASC']]
       });
 
       res.json({
@@ -368,7 +368,7 @@ class EstoqueController {
         order: [['nome', 'ASC']],
         include: [
           { model: CategoriaEstoque, as: 'categoria' },
-          { model: Fornecedor, as: 'fornecedor' }
+          { model: Fornecedor, as: 'fornecedor_principal' }
         ]
       });
 
@@ -400,7 +400,7 @@ class EstoqueController {
       const item = await ItemEstoque.findByPk(id, {
         include: [
           { model: CategoriaEstoque, as: 'categoria' },
-          { model: Fornecedor, as: 'fornecedor' },
+          { model: Fornecedor, as: 'fornecedor_principal' },
           {
             model: MovimentacaoEstoque,
             as: 'movimentacoes',
@@ -439,7 +439,7 @@ class EstoqueController {
       const itemCompleto = await ItemEstoque.findByPk(item.id, {
         include: [
           { model: CategoriaEstoque, as: 'categoria' },
-          { model: Fornecedor, as: 'fornecedor' }
+          { model: Fornecedor, as: 'fornecedor_principal' }
         ]
       });
       
@@ -475,7 +475,7 @@ class EstoqueController {
       const itemAtualizado = await ItemEstoque.findByPk(id, {
         include: [
           { model: CategoriaEstoque, as: 'categoria' },
-          { model: Fornecedor, as: 'fornecedor' }
+          { model: Fornecedor, as: 'fornecedor_principal' }
         ]
       });
       
@@ -564,7 +564,7 @@ class EstoqueController {
             as: 'item_estoque',
             include: [{ model: CategoriaEstoque, as: 'categoria' }]
           },
-          { model: Fornecedor, as: 'fornecedor' },
+          { model: Fornecedor, as: 'fornecedor_principal' },
           { model: User, as: 'usuario', attributes: ['id', 'nome'] },
           { model: User, as: 'aprovado_por', attributes: ['id', 'nome'] }
         ]
@@ -623,7 +623,7 @@ class EstoqueController {
             as: 'item_estoque',
             include: [{ model: CategoriaEstoque, as: 'categoria' }]
           },
-          { model: Fornecedor, as: 'fornecedor' },
+          { model: Fornecedor, as: 'fornecedor_principal' },
           { model: User, as: 'usuario', attributes: ['id', 'nome'] }
         ]
       });
@@ -664,7 +664,7 @@ class EstoqueController {
         where,
         include: [
           { model: CategoriaEstoque, as: 'categoria' },
-          { model: Fornecedor, as: 'fornecedor' }
+          { model: Fornecedor, as: 'fornecedor_principal' }
         ],
         order: [['categoria', 'nome'], ['nome']]
       });
@@ -734,7 +734,7 @@ class EstoqueController {
   async alertasEstoque(req, res) {
     try {
       // Itens com baixo estoque
-      const itensBaixoEstoque = await ItemEstoque.itensBaixoEstoque();
+      const itensBaixoEstoque = await ItemEstoque.listarEstoqueBaixo();
       
       // Itens críticos
       const itensCriticos = await ItemEstoque.findAll({
@@ -744,7 +744,7 @@ class EstoqueController {
         },
         include: [
           { model: CategoriaEstoque, as: 'categoria' },
-          { model: Fornecedor, as: 'fornecedor' }
+          { model: Fornecedor, as: 'fornecedor_principal' }
         ]
       });
       

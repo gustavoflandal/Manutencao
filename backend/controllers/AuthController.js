@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const { User } = require('../models');
 const AuthService = require('../services/AuthService');
+const AuditoriaService = require('../services/AuditoriaService');
 const logger = require('../config/logger');
 
 class AuthController {
@@ -106,6 +107,14 @@ class AuthController {
       });
 
       if (!user) {
+        // Registrar tentativa de login com email inexistente
+        await AuditoriaService.registrarLogin(
+          { email: email.toLowerCase() },
+          req,
+          false,
+          'Email não encontrado'
+        );
+        
         return res.status(401).json({
           success: false,
           message: 'Credenciais inválidas'
@@ -114,6 +123,14 @@ class AuthController {
 
       // Verificar se o usuário está ativo
       if (!user.ativo) {
+        // Registrar tentativa de login com usuário inativo
+        await AuditoriaService.registrarLogin(
+          user,
+          req,
+          false,
+          'Usuário inativo'
+        );
+        
         return res.status(401).json({
           success: false,
           message: 'Usuário inativo. Contate o administrador.'
@@ -123,6 +140,14 @@ class AuthController {
       // Verificar senha
       const senhaValida = await user.validatePassword(senha);
       if (!senhaValida) {
+        // Registrar tentativa de login falhada
+        await AuditoriaService.registrarLogin(
+          { email: email.toLowerCase() },
+          req,
+          false,
+          'Senha incorreta'
+        );
+        
         return res.status(401).json({
           success: false,
           message: 'Credenciais inválidas'
@@ -141,6 +166,9 @@ class AuthController {
 
       // Atualizar último login
       await user.update({ ultimo_login: new Date() });
+
+      // Registrar login bem-sucedido na auditoria
+      await AuditoriaService.registrarLogin(user, req, true);
 
       // Log de sucesso
       logger.info(`Login realizado: ${user.email}`, {
@@ -229,6 +257,9 @@ class AuthController {
   // Logout
   async logout(req, res) {
     try {
+      // Registrar logout na auditoria
+      await AuditoriaService.registrarLogout(req.user, req);
+      
       // Aqui poderia implementar blacklist de tokens se necessário
       logger.info(`Logout realizado: ${req.user.email}`, {
         userId: req.user.id,

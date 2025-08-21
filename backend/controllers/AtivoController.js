@@ -1,7 +1,8 @@
-const { Ativo, Category, SubCategory, Department, User, Setor } = require('../models');
+const { Ativo, Category, SubCategory, Department, User, Setor, AtivoImagem } = require('../models');
 const { Op } = require('sequelize');
 const logger = require('../config/logger');
 const QRCodeService = require('../services/QRCodeService');
+const AuditoriaService = require('../services/AuditoriaService');
 
 class AtivoController {
   // Listar ativos com paginação e filtros
@@ -170,6 +171,12 @@ class AtivoController {
     try {
       const ativoData = req.body;
 
+      // Limpar campos vazios que devem ser null para campos de relacionamento
+      if (ativoData.categoria_id === '') ativoData.categoria_id = null;
+      if (ativoData.subcategoria_id === '') ativoData.subcategoria_id = null;
+      if (ativoData.department_id === '') ativoData.department_id = null;
+      if (ativoData.responsavel_id === '') ativoData.responsavel_id = null;
+
       // Validar dados obrigatórios
       if (!ativoData.nome) {
         return res.status(400).json({
@@ -209,6 +216,15 @@ class AtivoController {
         user_id: req.user?.id
       });
 
+      // Registrar auditoria da criação
+      await AuditoriaService.registrarCriacao(
+        AuditoriaService.modulos.ATIVOS,
+        ativo,
+        req.user,
+        req,
+        `Criação do ativo ${ativo.codigo_patrimonio} - ${ativo.nome}`
+      );
+
       // Gerar QR code para o ativo
       try {
         const qrCodeUrl = await QRCodeService.generateAtivoQRCode(ativo);
@@ -237,6 +253,12 @@ class AtivoController {
       const { id } = req.params;
       const updateData = req.body;
 
+      // Limpar campos vazios que devem ser null para campos de relacionamento
+      if (updateData.categoria_id === '') updateData.categoria_id = null;
+      if (updateData.subcategoria_id === '') updateData.subcategoria_id = null;
+      if (updateData.department_id === '') updateData.department_id = null;
+      if (updateData.responsavel_id === '') updateData.responsavel_id = null;
+
       const ativo = await Ativo.findByPk(id);
 
       if (!ativo) {
@@ -263,6 +285,9 @@ class AtivoController {
         }
       }
 
+      // Capturar estado anterior para auditoria
+      const estadoAnterior = ativo.toJSON();
+
       await ativo.update(updateData);
 
       // Buscar ativo atualizado com associações
@@ -279,6 +304,16 @@ class AtivoController {
         ativo_id: id,
         user_id: req.user?.id
       });
+
+      // Registrar auditoria da atualização
+      await AuditoriaService.registrarAtualizacao(
+        AuditoriaService.modulos.ATIVOS,
+        estadoAnterior,
+        ativoAtualizado.toJSON(),
+        req.user,
+        req,
+        `Atualização do ativo ${ativo.codigo_patrimonio} - ${ativo.nome}`
+      );
 
       res.json({
         success: true,
@@ -312,6 +347,15 @@ class AtivoController {
         ativo_id: id,
         user_id: req.user?.id
       });
+
+      // Registrar auditoria da exclusão
+      await AuditoriaService.registrarExclusao(
+        AuditoriaService.modulos.ATIVOS,
+        ativo,
+        req.user,
+        req,
+        `Desativação do ativo ${ativo.codigo_patrimonio} - ${ativo.nome}`
+      );
 
       res.json({
         success: true,
@@ -452,6 +496,191 @@ class AtivoController {
 
     } catch (error) {
       logger.error('Erro ao listar ativos para seleção:', error);
+      next(error);
+    }
+  }
+
+  // Upload de imagens para um ativo
+  async uploadImagens(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { uploadImagens } = require('../utils/uploadHandler');
+
+      const ativo = await Ativo.findByPk(id);
+      if (!ativo) {
+        return res.status(404).json({
+          success: false,
+          message: 'Ativo não encontrado'
+        });
+      }
+
+      // Verificar número de imagens existentes
+      const imagensExistentes = await AtivoImagem.count({ where: { ativo_id: id }});
+      if (imagensExistentes >= 4) {
+        return res.status(400).json({
+          success: false,
+          message: 'Limite máximo de 4 imagens atingido'
+        });
+      }
+
+      // Fazer upload das imagens
+      const files = await uploadImagens(req, res);
+      if (!files || files.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'Nenhuma imagem enviada'
+        });
+      }
+
+      // Criar registros para cada imagem
+      const imagens = [];
+      for (let i = 0; i < files.length && (imagensExistentes + i) < 4; i++) {
+        const imagem = await AtivoImagem.create({
+          ativo_id: id,
+          nome_arquivo: files[i].filename,
+          caminho: `/uploads/ativos/${files[i].filename}`,
+          tipo: files[i].mimetype,
+          tamanho: files[i].size,
+          ordem: imagensExistentes + i
+        });
+        imagens.push(imagem);
+      }
+
+      logger.info(`Imagens adicionadas ao ativo ${ativo.codigo_patrimonio}`, {
+        ativo_id: id,
+        quantidade: imagens.length,
+        user_id: req.user?.id
+      });
+
+      res.json({
+        success: true,
+        message: 'Imagens enviadas com sucesso',
+        data: { imagens }
+      });
+
+    } catch (error) {
+      logger.error('Erro no upload de imagens:', error);
+      next(error);
+    }
+  }
+
+  // Listar imagens de um ativo
+  async listarImagens(req, res, next) {
+    try {
+      const { id } = req.params;
+
+      const imagens = await AtivoImagem.findAll({
+        where: { ativo_id: id },
+        order: [['ordem', 'ASC']],
+      });
+
+      res.json({
+        success: true,
+        data: { imagens }
+      });
+
+    } catch (error) {
+      logger.error('Erro ao listar imagens:', error);
+      next(error);
+    }
+  }
+
+  // Remover imagem de um ativo
+  async removerImagem(req, res, next) {
+    try {
+      const { id, imagemId } = req.params;
+      const fs = require('fs').promises;
+      const path = require('path');
+
+      const imagem = await AtivoImagem.findOne({
+        where: { id: imagemId, ativo_id: id }
+      });
+
+      if (!imagem) {
+        return res.status(404).json({
+          success: false,
+          message: 'Imagem não encontrada'
+        });
+      }
+
+      // Remover arquivo físico
+      const caminhoCompleto = path.join(__dirname, '..', 'uploads', 'ativos', imagem.nome_arquivo);
+      await fs.unlink(caminhoCompleto).catch(() => {});
+
+      // Remover registro do banco
+      await imagem.destroy();
+
+      // Reordenar imagens restantes
+      const imagensRestantes = await AtivoImagem.findAll({
+        where: { ativo_id: id },
+        order: [['ordem', 'ASC']]
+      });
+
+      for (let i = 0; i < imagensRestantes.length; i++) {
+        await imagensRestantes[i].update({ ordem: i });
+      }
+
+      res.json({
+        success: true,
+        message: 'Imagem removida com sucesso'
+      });
+
+    } catch (error) {
+      logger.error('Erro ao remover imagem:', error);
+      next(error);
+    }
+  }
+
+  // Atualizar ordem da imagem
+  async atualizarOrdemImagem(req, res, next) {
+    try {
+      const { id, imagemId } = req.params;
+      const { ordem } = req.body;
+
+      const imagem = await AtivoImagem.findOne({
+        where: { id: imagemId, ativo_id: id }
+      });
+
+      if (!imagem) {
+        return res.status(404).json({
+          success: false,
+          message: 'Imagem não encontrada'
+        });
+      }
+
+      // Validar nova ordem
+      if (ordem < 0 || ordem > 3) {
+        return res.status(400).json({
+          success: false,
+          message: 'Ordem inválida'
+        });
+      }
+
+      // Reordenar imagens
+      const imagens = await AtivoImagem.findAll({
+        where: { ativo_id: id },
+        order: [['ordem', 'ASC']]
+      });
+
+      const novasOrdens = imagens.map((img, index) => {
+        if (img.id === parseInt(imagemId)) return ordem;
+        if (ordem > img.ordem && img.ordem > imagem.ordem) return img.ordem - 1;
+        if (ordem < img.ordem && img.ordem < imagem.ordem) return img.ordem + 1;
+        return img.ordem;
+      });
+
+      // Atualizar ordem de todas as imagens
+      await Promise.all(imagens.map((img, index) => 
+        img.update({ ordem: novasOrdens[index] })
+      ));
+
+      res.json({
+        success: true,
+        message: 'Ordem atualizada com sucesso'
+      });
+
+    } catch (error) {
+      logger.error('Erro ao atualizar ordem da imagem:', error);
       next(error);
     }
   }

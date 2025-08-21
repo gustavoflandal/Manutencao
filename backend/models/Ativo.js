@@ -436,5 +436,42 @@ module.exports = (sequelize) => {
     });
   };
 
+  // Definir associações
+  Ativo.associate = (models) => {
+    // Associações existentes
+    Ativo.belongsTo(models.Category, {
+      foreignKey: 'categoria_id',
+      as: 'categoria'
+    });
+
+    Ativo.belongsTo(models.SubCategory, {
+      foreignKey: 'subcategoria_id',
+      as: 'subcategoria'
+    });
+
+    Ativo.belongsTo(models.Department, {
+      foreignKey: 'department_id',
+      as: 'department'
+    });
+
+    Ativo.belongsTo(models.User, {
+      foreignKey: 'responsavel_id',
+      as: 'responsavel'
+    });
+
+    Ativo.belongsTo(models.Setor, {
+      foreignKey: 'setor_id',
+      as: 'setor'
+    });
+
+    // Nova associação com imagens
+    if (models.AtivoImagem) {
+      Ativo.hasMany(models.AtivoImagem, {
+        foreignKey: 'ativo_id',
+        as: 'imagens'
+      });
+    }
+  };
+
   return Ativo;
 };

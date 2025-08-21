@@ -13,16 +13,16 @@
         <router-link to="/solicitacoes" class="nav-link">Solicitações</router-link>
         <router-link v-if="authStore.hasRole('tecnico')" to="/ordens-servico" class="nav-link">Ordens de Serviço</router-link>
         <router-link to="/ativos" class="nav-link">Ativos</router-link>
-        <router-link v-if="authStore.hasRole('tecnico')" to="/setores" class="nav-link">Setores</router-link>
         <router-link v-if="authStore.hasRole('tecnico')" to="/preventiva" class="nav-link">Preventiva</router-link>
         <router-link v-if="authStore.hasRole('tecnico')" to="/estoque" class="nav-link">Estoque</router-link>
         <router-link v-if="authStore.hasRole('tecnico')" to="/workflows" class="nav-link">Workflows</router-link>
-        <router-link to="/reports" class="nav-link">Relatórios</router-link>
-        <router-link to="/help" class="nav-link">Ajuda</router-link>
-        <router-link v-if="authStore.hasRole('supervisor')" to="/users" class="nav-link">Usuários</router-link>
+        <router-link v-if="authStore.hasRole('tecnico')" to="/setores" class="nav-link">Setores</router-link>
         <router-link to="/departments" class="nav-link">Departamentos</router-link>
+        <router-link to="/reports" class="nav-link">Relatórios</router-link>
+        <router-link v-if="authStore.hasRole('supervisor')" to="/users" class="nav-link">Usuários</router-link>
         <router-link v-if="authStore.hasRole('supervisor')" to="/permissions" class="nav-link">Permissões</router-link>
         <router-link to="/profile" class="nav-link">Perfil</router-link>
+        <router-link to="/help" class="nav-link">Ajuda</router-link>
         <button @click="handleLogout" class="nav-button logout-button">
           <Icon name="logout" size="16" />
           Sair
@@ -139,11 +139,17 @@ const handleLogout = () => {
 .navbar {
   background: var(--primary-color);
   color: white;
-  padding: 1rem 2rem;
+  padding: 0.75rem 2rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  height: 60px;
 }
 
 .navbar-brand .brand-link {
@@ -176,15 +182,21 @@ const handleLogout = () => {
 .navbar-menu {
   display: flex;
   align-items: center;
-  gap: 2rem;
+  gap: 1.25rem;
+  flex: 1;
+  justify-content: center;
+  margin: 0 2rem;
 }
 
 .nav-link {
   color: white;
   text-decoration: none;
-  padding: 0.5rem 1rem;
+  padding: 0.4rem 0.75rem;
   border-radius: 6px;
   transition: background-color 0.2s;
+  font-size: 0.875rem;
+  white-space: nowrap;
+  letter-spacing: -0.2px;
 }
 
 .nav-link:hover,
@@ -243,7 +255,8 @@ main {
 }
 
 main.with-navbar {
-  min-height: calc(100vh - 80px);
+  min-height: calc(100vh - 60px);
+  margin-top: 60px;
 }
 
 .toast-container {

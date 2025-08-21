@@ -1,9 +1,11 @@
 const { Op } = require('sequelize');
-const Workflow = require('../models/Workflow');
-const WorkflowInstancia = require('../models/WorkflowInstancia');
-const WorkflowAcao = require('../models/WorkflowAcao');
-const User = require('../models/User');
-const Setor = require('../models/Setor');
+const { 
+  Workflow, 
+  WorkflowInstancia, 
+  WorkflowAcao, 
+  User, 
+  Setor 
+} = require('../models');
 
 class WorkflowController {
   // ===== MÉTODOS DE WORKFLOW =====
@@ -44,7 +46,7 @@ class WorkflowController {
           {
             model: User,
             as: 'criador',
-            attributes: ['id', 'name', 'email']
+            attributes: ['id', 'nome', 'email']
           },
           {
             model: Setor,
@@ -109,7 +111,7 @@ class WorkflowController {
           {
             model: User,
             as: 'criador',
-            attributes: ['id', 'name', 'email']
+            attributes: ['id', 'nome', 'email']
           },
           {
             model: Setor,
@@ -368,12 +370,12 @@ class WorkflowController {
           {
             model: User,
             as: 'iniciador',
-            attributes: ['id', 'name', 'email']
+            attributes: ['id', 'nome', 'email']
           },
           {
             model: User,
             as: 'responsavel',
-            attributes: ['id', 'name', 'email']
+            attributes: ['id', 'nome', 'email']
           }
         ],
         offset,
@@ -413,17 +415,17 @@ class WorkflowController {
           {
             model: User,
             as: 'iniciador',
-            attributes: ['id', 'name', 'email']
+            attributes: ['id', 'nome', 'email']
           },
           {
             model: User,
             as: 'responsavel',
-            attributes: ['id', 'name', 'email']
+            attributes: ['id', 'nome', 'email']
           },
           {
             model: User,
             as: 'aprovador_atual',
-            attributes: ['id', 'name', 'email']
+            attributes: ['id', 'nome', 'email']
           },
           {
             model: WorkflowAcao,
