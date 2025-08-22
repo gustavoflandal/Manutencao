@@ -1,4 +1,4 @@
-const { DataTypes } = require('sequelize');
+const { DataTypes, Op } = require('sequelize');
 
 module.exports = (sequelize) => {
   const MovimentacaoEstoque = sequelize.define('MovimentacaoEstoque', {
@@ -234,6 +234,9 @@ module.exports = (sequelize) => {
     }
   }, {
     tableName: 'movimentacoes_estoque',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     hooks: {
       beforeCreate: async (movimentacao) => {
         // Gerar número da movimentação automaticamente
@@ -242,8 +245,8 @@ module.exports = (sequelize) => {
           const count = await MovimentacaoEstoque.count({
             where: {
               createdAt: {
-                [sequelize.Op.gte]: new Date(ano, 0, 1),
-                [sequelize.Op.lt]: new Date(ano + 1, 0, 1)
+                [Op.gte]: new Date(ano, 0, 1),
+                [Op.lt]: new Date(ano + 1, 0, 1)
               }
             }
           });
@@ -414,7 +417,7 @@ module.exports = (sequelize) => {
   MovimentacaoEstoque.relatorioPorPeriodo = async function(dataInicio, dataFim, filtros = {}) {
     const where = {
       data_movimentacao: {
-        [sequelize.Op.between]: [dataInicio, dataFim]
+        [Op.between]: [dataInicio, dataFim]
       },
       ...filtros
     };
@@ -434,7 +437,7 @@ module.exports = (sequelize) => {
     const movimentacoes = await this.findAll({
       where: {
         data_movimentacao: {
-          [sequelize.Op.between]: [dataInicio, dataFim]
+          [Op.between]: [dataInicio, dataFim]
         }
       },
       attributes: [

@@ -61,6 +61,9 @@ module.exports = (sequelize) => {
     }
   }, {
     tableName: 'categorias_estoque',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     hooks: {
       beforeCreate: async (categoria) => {
         // Gerar código automaticamente se não fornecido

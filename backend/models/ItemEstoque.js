@@ -1,4 +1,4 @@
-const { DataTypes } = require('sequelize');
+const { DataTypes, Op } = require('sequelize');
 
 module.exports = (sequelize) => {
   const ItemEstoque = sequelize.define('ItemEstoque', {
@@ -269,6 +269,9 @@ module.exports = (sequelize) => {
     }
   }, {
     tableName: 'itens_estoque',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     hooks: {
       beforeCreate: async (item) => {
         // Gerar código automaticamente se não fornecido
@@ -362,7 +365,7 @@ module.exports = (sequelize) => {
       where: {
         tipo_movimentacao: 'saida',
         data_movimentacao: {
-          [sequelize.Op.gte]: new Date(Date.now() - dias * 24 * 60 * 60 * 1000)
+          [Op.gte]: new Date(Date.now() - dias * 24 * 60 * 60 * 1000)
         }
       }
     });
@@ -408,11 +411,11 @@ module.exports = (sequelize) => {
   ItemEstoque.listarEstoqueBaixo = async function() {
     return await this.findAll({
       where: {
-        [sequelize.Op.and]: [
+        [Op.and]: [
           { ativo: true },
           sequelize.where(
             sequelize.col('quantidade_atual'),
-            sequelize.Op.lte,
+            Op.lte,
             sequelize.col('quantidade_minima')
           )
         ]
@@ -428,11 +431,11 @@ module.exports = (sequelize) => {
   ItemEstoque.listarPontoReposicao = async function() {
     return await this.findAll({
       where: {
-        [sequelize.Op.and]: [
+        [Op.and]: [
           { ativo: true },
           sequelize.where(
             sequelize.col('quantidade_atual'),
-            sequelize.Op.lte,
+            Op.lte,
             sequelize.col('ponto_reposicao')
           )
         ]
@@ -449,11 +452,11 @@ module.exports = (sequelize) => {
     const total = await this.count({ where: { ativo: true } });
     const estoqueBaixo = await this.count({
       where: {
-        [sequelize.Op.and]: [
+        [Op.and]: [
           { ativo: true },
           sequelize.where(
             sequelize.col('quantidade_atual'),
-            sequelize.Op.lte,
+            Op.lte,
             sequelize.col('quantidade_minima')
           )
         ]
@@ -462,11 +465,11 @@ module.exports = (sequelize) => {
     
     const pontoReposicao = await this.count({
       where: {
-        [sequelize.Op.and]: [
+        [Op.and]: [
           { ativo: true },
           sequelize.where(
             sequelize.col('quantidade_atual'),
-            sequelize.Op.lte,
+            Op.lte,
             sequelize.col('ponto_reposicao')
           )
         ]

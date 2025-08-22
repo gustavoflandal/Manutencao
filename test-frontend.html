@@ -52,15 +52,19 @@
     <div class="test-section">
         <h3>🔐 Autenticação</h3>
         <p><strong>Status:</strong> <span id="auth-status">Verificando...</span></p>
-        <button onclick="testLogin()">Testar Login (admin/123456)</button>
+        <button onclick="testLogin()">Testar Login Detalhado</button>
         <button onclick="clearStorage()">Limpar Armazenamento</button>
+        <button onclick="checkLocalStorage()">Analisar localStorage</button>
+        <button onclick="testVueFlowSimulation()">Simular Fluxo Vue Completo</button>
     </div>
     
     <div class="test-section">
         <h3>📊 Dados</h3>
+        <p><strong>Setores:</strong> <span id="setores-status">Carregando...</span></p>
         <p><strong>Departamentos:</strong> <span id="departments-status">Carregando...</span></p>
         <p><strong>Usuários:</strong> <span id="users-status">Carregando...</span></p>
         <button onclick="testEndpoints()">Testar Endpoints</button>
+        <button onclick="testSetoresSpecific()">Testar APENAS Setores</button>
     </div>
     
     <div class="test-section">
@@ -77,7 +81,7 @@
     </div>
 
     <script>
-        const API_BASE = 'http://localhost:3001/api';
+        const API_BASE = 'http://localhost:3000/api';
         const FRONTEND_URL = 'http://localhost:3004';
         
         let logs = [];
@@ -157,8 +161,15 @@
         }
         
         async function testLogin() {
+            addLog('🔐 INICIANDO TESTE DETALHADO DE AUTENTICAÇÃO');
+            
+            // 1. Limpar localStorage antes do teste
+            localStorage.clear();
+            addLog('1️⃣ localStorage limpo');
+            
             try {
-                addLog('Login: Tentando autenticar como admin...');
+                // 2. Testar API de login
+                addLog('2️⃣ Enviando requisição de login...');
                 const response = await fetch(API_BASE + '/auth/login', {
                     method: 'POST',
                     headers: {
@@ -170,24 +181,153 @@
                     })
                 });
                 
-                const data = await response.json();
+                addLog('3️⃣ Response status: ' + response.status);
                 
-                if (response.ok && data.success) {
-                    localStorage.setItem('access_token', data.data.accessToken);
-                    localStorage.setItem('refresh_token', data.data.refreshToken);
-                    addLog('Login: Sucesso! Token armazenado.');
-                    await checkAuth();
+                if (response.ok) {
+                    const data = await response.json();
+                    addLog('4️⃣ Response data: ' + JSON.stringify(data, null, 2));
+                    
+                    if (data.success && data.data && data.data.accessToken) {
+                        const accessToken = data.data.accessToken;
+                        const refreshToken = data.data.refreshToken;
+                        
+                        addLog('5️⃣ Tokens recebidos:');
+                        addLog('   - AccessToken: ' + accessToken.substring(0, 30) + '...');
+                        addLog('   - RefreshToken: ' + (refreshToken ? refreshToken.substring(0, 30) + '...' : 'NULL'));
+                        
+                        // 6. Testar salvamento no localStorage
+                        addLog('6️⃣ Salvando no localStorage...');
+                        localStorage.setItem('access_token', accessToken);
+                        if (refreshToken) {
+                            localStorage.setItem('refresh_token', refreshToken);
+                        }
+                        
+                        // 7. Verificar se foi salvo
+                        addLog('7️⃣ Verificando localStorage após salvamento:');
+                        const savedAccess = localStorage.getItem('access_token');
+                        const savedRefresh = localStorage.getItem('refresh_token');
+                        
+                        addLog('   - Saved AccessToken: ' + (savedAccess ? savedAccess.substring(0, 30) + '...' : 'NULL'));
+                        addLog('   - Saved RefreshToken: ' + (savedRefresh ? savedRefresh.substring(0, 30) + '...' : 'NULL'));
+                        
+                        // 8. Testar validade do token
+                        addLog('8️⃣ Testando validade do token...');
+                        const verifyResponse = await fetch(API_BASE + '/auth/verify', {
+                            headers: {
+                                'Authorization': 'Bearer ' + savedAccess
+                            }
+                        });
+                        
+                        if (verifyResponse.ok) {
+                            const verifyData = await verifyResponse.json();
+                            addLog('9️⃣ Token válido! Usuário: ' + JSON.stringify(verifyData.data?.user || {}));
+                            updateStatus('auth-status', '✅ Autenticado - ' + (verifyData.data?.user?.nome || 'admin'), true);
+                            
+                            // 10. Simular reload da página
+                            addLog('🔄 Simulando reload da página...');
+                            setTimeout(() => {
+                                const afterReload = localStorage.getItem('access_token');
+                                addLog('🔍 Token após "reload": ' + (afterReload ? afterReload.substring(0, 30) + '...' : 'NULL'));
+                                if (!afterReload) {
+                                    addLog('❌ PROBLEMA ENCONTRADO: Token desapareceu após reload!');
+                                } else {
+                                    addLog('✅ Token persistiu após reload');
+                                }
+                            }, 1000);
+                            
+                        } else {
+                            addLog('❌ Token inválido - Status: ' + verifyResponse.status);
+                        }
+                        
+                    } else {
+                        addLog('❌ Login: Resposta inválida - ' + JSON.stringify(data));
+                    }
                 } else {
-                    addLog('Login: Falha - ' + (data.message || 'Erro desconhecido'));
+                    const errorData = await response.json();
+                    addLog('❌ Login falhou - ' + (errorData.message || 'Erro desconhecido'));
                 }
             } catch (error) {
-                addLog('Login: Erro - ' + error.message);
+                addLog('❌ Erro no teste de login: ' + error.message);
+            }
+        }
+        
+        async function testSetoresSpecific() {
+            const token = localStorage.getItem('access_token');
+            
+            if (!token) {
+                addLog('Setores: ERRO - Nenhum token encontrado. Fazendo login primeiro...');
+                await testLogin();
+                return;
+            }
+            
+            addLog('Setores: Testando endpoint /setores/ativos com token...');
+            
+            try {
+                const response = await fetch(API_BASE + '/setores/ativos', {
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                addLog('Setores: Response status = ' + response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    addLog('Setores: Response data = ' + JSON.stringify(data, null, 2));
+                    
+                    if (data.success && data.data && data.data.setores) {
+                        const setores = data.data.setores;
+                        updateStatus('setores-status', '✅ ' + setores.length + ' setores carregados', true);
+                        addLog('Setores: SUCCESS - ' + setores.length + ' setores encontrados');
+                        
+                        setores.forEach(setor => {
+                            addLog('  - ' + setor.codigo + ': ' + setor.nome);
+                        });
+                    } else {
+                        updateStatus('setores-status', '❌ Resposta inválida', false);
+                        addLog('Setores: ERRO - Formato de resposta inválido');
+                    }
+                } else {
+                    const errorText = await response.text();
+                    updateStatus('setores-status', '❌ HTTP ' + response.status, false);
+                    addLog('Setores: ERRO HTTP ' + response.status + ' - ' + errorText);
+                }
+                
+            } catch (error) {
+                updateStatus('setores-status', '❌ Erro: ' + error.message, false);
+                addLog('Setores: EXCEPTION - ' + error.message);
             }
         }
         
         async function testEndpoints() {
             const token = localStorage.getItem('access_token');
-            const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+            const headers = token ? { 
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            } : {};
+            
+            // Teste setores (requer autenticação)
+            if (token) {
+                try {
+                    const response = await fetch(API_BASE + '/setores/ativos', { headers });
+                    if (response.ok) {
+                        const data = await response.json();
+                        const setores = data.data?.setores || [];
+                        updateStatus('setores-status', '✅ ' + setores.length + ' setores', true);
+                        addLog('Setores: ' + setores.length + ' encontrados');
+                    } else {
+                        updateStatus('setores-status', '❌ Erro HTTP ' + response.status, false);
+                        addLog('Setores: Erro HTTP ' + response.status);
+                    }
+                } catch (error) {
+                    updateStatus('setores-status', '❌ Erro: ' + error.message, false);
+                    addLog('Setores: Erro - ' + error.message);
+                }
+            } else {
+                updateStatus('setores-status', '⚠️ Requer autenticação', false);
+                addLog('Setores: Token necessário');
+            }
             
             // Teste departamentos (público)
             try {
@@ -235,14 +375,182 @@
         }
         
         function checkLocalStorage() {
+            addLog('🗄️ TESTE DETALHADO DO LOCALSTORAGE');
+            
+            // Verificar suporte
+            if (typeof(Storage) !== "undefined") {
+                addLog('✅ localStorage é suportado pelo navegador');
+            } else {
+                addLog('❌ localStorage NÃO é suportado pelo navegador');
+                return;
+            }
+            
+            // Teste básico de escrita/leitura
+            addLog('📝 Testando escrita/leitura básica...');
+            try {
+                localStorage.setItem('test_key', 'test_value');
+                const testValue = localStorage.getItem('test_key');
+                addLog('   - Valor salvo: test_value');
+                addLog('   - Valor lido: ' + testValue);
+                if (testValue === 'test_value') {
+                    addLog('✅ localStorage funciona corretamente');
+                } else {
+                    addLog('❌ localStorage não está funcionando');
+                }
+                localStorage.removeItem('test_key');
+            } catch (error) {
+                addLog('❌ Erro no teste de localStorage: ' + error.message);
+            }
+            
+            // Verificar tokens atuais
+            addLog('🔍 Verificando tokens atuais...');
             const token = localStorage.getItem('access_token');
             const refresh = localStorage.getItem('refresh_token');
-            addLog('Storage: Token=' + (token ? 'SIM (' + token.substring(0, 20) + '...)' : 'NÃO'));
-            addLog('Storage: Refresh=' + (refresh ? 'SIM (' + refresh.substring(0, 20) + '...)' : 'NÃO'));
+            
+            addLog('   - Access Token: ' + (token ? token.substring(0, 30) + '... (' + token.length + ' chars)' : 'NÃO EXISTE'));
+            addLog('   - Refresh Token: ' + (refresh ? refresh.substring(0, 30) + '... (' + refresh.length + ' chars)' : 'NÃO EXISTE'));
+            
+            // Listar todas as chaves
+            addLog('📋 Todas as chaves no localStorage:');
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                addLog('   - ' + key + ': ' + (value ? value.substring(0, 50) + '...' : 'empty'));
+            }
+            
+            if (localStorage.length === 0) {
+                addLog('   (localStorage está vazio)');
+            }
+        }
+        
+        async function testVueFlowSimulation() {
+            addLog('🎭 SIMULANDO FLUXO COMPLETO DO SISTEMA VUE');
+            
+            // 1. Estado inicial - simular inicialização do store
+            addLog('1️⃣ Simulando inicialização do store Pinia...');
+            localStorage.clear();
+            
+            // Simular dados do store
+            let storeState = {
+                user: null,
+                token: null,
+                refreshToken: null,
+                isAuthenticated: false
+            };
+            
+            addLog('   - Estado inicial: ' + JSON.stringify(storeState));
+            
+            // 2. Simular check inicial de autenticação
+            addLog('2️⃣ Verificando autenticação inicial...');
+            const storedToken = localStorage.getItem('access_token');
+            addLog('   - Token no localStorage: ' + (storedToken || 'NÃO EXISTE'));
+            
+            if (storedToken) {
+                storeState.token = storedToken;
+                storeState.isAuthenticated = true;
+                addLog('   - Store atualizado com token existente');
+            } else {
+                addLog('   - Nenhum token encontrado, usuário não autenticado');
+            }
+            
+            // 3. Simular processo de login
+            addLog('3️⃣ Iniciando processo de login...');
+            try {
+                const loginResponse = await fetch(API_BASE + '/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        email: 'admin@sistema.com',
+                        senha: '123456'
+                    })
+                });
+                
+                if (loginResponse.ok) {
+                    const loginData = await loginResponse.json();
+                    addLog('4️⃣ Login bem-sucedido, atualizando store...');
+                    
+                    // Simular atualização do store
+                    storeState.user = loginData.data.user;
+                    storeState.token = loginData.data.accessToken;
+                    storeState.refreshToken = loginData.data.refreshToken;
+                    storeState.isAuthenticated = true;
+                    
+                    addLog('   - Store atualizado: ' + JSON.stringify({
+                        user: storeState.user?.nome || 'N/A',
+                        hasToken: !!storeState.token,
+                        isAuth: storeState.isAuthenticated
+                    }));
+                    
+                    // 5. Simular salvamento no localStorage
+                    addLog('5️⃣ Salvando tokens no localStorage...');
+                    localStorage.setItem('access_token', storeState.token);
+                    localStorage.setItem('refresh_token', storeState.refreshToken);
+                    
+                    // 6. Verificar se salvou
+                    addLog('6️⃣ Verificando se tokens foram salvos...');
+                    const verifyAccess = localStorage.getItem('access_token');
+                    const verifyRefresh = localStorage.getItem('refresh_token');
+                    
+                    addLog('   - Access salvo: ' + (verifyAccess ? 'SIM' : 'NÃO'));
+                    addLog('   - Refresh salvo: ' + (verifyRefresh ? 'SIM' : 'NÃO'));
+                    
+                    if (verifyAccess && verifyRefresh) {
+                        addLog('✅ Tokens salvos com sucesso!');
+                        
+                        // 7. Simular verificação de auth guard
+                        addLog('7️⃣ Simulando auth guard do Vue Router...');
+                        const isAuthenticatedComputed = () => {
+                            const token = localStorage.getItem('access_token');
+                            return !!token && !!storeState.user;
+                        };
+                        
+                        const authGuardResult = isAuthenticatedComputed();
+                        addLog('   - isAuthenticated computed: ' + authGuardResult);
+                        
+                        if (authGuardResult) {
+                            addLog('✅ Auth guard permitiria acesso ao dashboard');
+                        } else {
+                            addLog('❌ Auth guard redirecionaria para login');
+                        }
+                        
+                        // 8. Simular reload da página
+                        addLog('8️⃣ Simulando reload da página (novo ciclo)...');
+                        setTimeout(() => {
+                            const afterReloadToken = localStorage.getItem('access_token');
+                            addLog('   - Token após reload: ' + (afterReloadToken ? 'EXISTE' : 'NÃO EXISTE'));
+                            
+                            if (afterReloadToken) {
+                                addLog('✅ FLUXO COMPLETO: Autenticação persistiu corretamente!');
+                                addLog('🎉 Sistema funcionaria normalmente');
+                            } else {
+                                addLog('❌ PROBLEMA: Token perdido após reload');
+                                addLog('💥 Usuário seria redirecionado para login novamente');
+                            }
+                        }, 1500);
+                        
+                    } else {
+                        addLog('❌ ERRO: Tokens não foram salvos no localStorage');
+                    }
+                    
+                } else {
+                    addLog('❌ Login falhou: ' + loginResponse.status);
+                }
+                
+            } catch (error) {
+                addLog('❌ Erro no fluxo de login: ' + error.message);
+            }
         }
         
         async function testApiHealth() {
             await testBackend();
+        }
+        
+        function openTestInBrowser() {
+            const filePath = 'file:///' + 'c:/Manutencao/test-frontend.html';
+            window.open(filePath, '_blank');
+            addLog('🌐 Abrindo arquivo no navegador: ' + filePath);
         }
         
         // Executar testes iniciais

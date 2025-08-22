@@ -157,6 +157,9 @@ module.exports = (sequelize) => {
     }
   }, {
     tableName: 'fornecedores',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     hooks: {
       beforeCreate: async (fornecedor) => {
         // Gerar código automaticamente se não fornecido

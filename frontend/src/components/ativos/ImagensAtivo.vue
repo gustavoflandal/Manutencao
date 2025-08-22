@@ -58,8 +58,8 @@
             <p class="size-info">Máx. 5MB por imagem • JPEG, PNG, WebP</p>
           </div>
           
-          <div class="upload-buttons">
-            <label for="upload-imagem" class="upload-btn primary">
+          <div class="upload-action">
+            <label for="upload-imagem" class="btn btn-primary upload-btn-single">
               <Icon name="plus-circle" size="20" />
               <span>Selecionar Imagens</span>
             </label>
@@ -69,20 +69,6 @@
               accept="image/jpeg,image/png,image/webp"
               @change="uploadImagem"
               multiple
-              class="upload-input"
-            />
-            
-            <label for="upload-pasta" class="upload-btn secondary">
-              <Icon name="folder" size="20" />
-              <span>Importar Pasta</span>
-            </label>
-            <input 
-              id="upload-pasta"
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              @change="uploadPasta"
-              multiple
-              webkitdirectory
               class="upload-input"
             />
           </div>
@@ -138,16 +124,7 @@ const uploadImagem = async (event) => {
   event.target.value = ''; // Limpar input
 };
 
-// Upload de pasta
-const uploadPasta = async (event) => {
-  const files = Array.from(event.target.files);
-  // Filtrar apenas imagens
-  const imagemFiles = files.filter(file => file.type.startsWith('image/'));
-  await processarUpload(imagemFiles);
-  event.target.value = ''; // Limpar input
-};
-
-// Processar upload comum para imagens e pastas
+// Processar upload de imagens
 const processarUpload = async (files) => {
   const remainingSlots = 4 - imagens.value.length;
   
@@ -382,14 +359,13 @@ onMounted(() => {
   margin: 0;
 }
 
-.upload-buttons {
+.upload-action {
   display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
   justify-content: center;
+  margin-top: 1.5rem;
 }
 
-.upload-btn {
+.upload-btn-single {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -401,25 +377,14 @@ onMounted(() => {
   text-decoration: none;
   border: none;
   font-size: 0.875rem;
-}
-
-.upload-btn.primary {
   background: #3b82f6;
   color: white;
+  min-width: 180px;
+  justify-content: center;
 }
 
-.upload-btn.primary:hover {
+.upload-btn-single:hover {
   background: #2563eb;
-  transform: translateY(-1px);
-}
-
-.upload-btn.secondary {
-  background: #10b981;
-  color: white;
-}
-
-.upload-btn.secondary:hover {
-  background: #059669;
   transform: translateY(-1px);
 }
 
@@ -458,14 +423,14 @@ onMounted(() => {
     padding: 1rem;
   }
   
-  .upload-buttons {
-    flex-direction: column;
-    width: 100%;
+  .upload-action {
+    margin-top: 1rem;
   }
   
-  .upload-btn {
+  .upload-btn-single {
     width: 100%;
-    justify-content: center;
+    padding: 0.875rem 1.5rem;
+    font-size: 0.875rem;
   }
 }
 </style>

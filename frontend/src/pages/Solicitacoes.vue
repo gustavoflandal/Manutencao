@@ -22,7 +22,7 @@
             SubCategoria
           </button>
         </div>
-        <button class="btn btn-primary" @click="$router.push('/solicitacoes/create')">
+        <button class="btn btn-primary" @click="abrirModalSolicitacao">
           <i class="fas fa-plus"></i>
           Nova Solicitação
         </button>
@@ -139,7 +139,7 @@
     <div v-else class="empty-state">
       <h3>Nenhuma solicitação encontrada</h3>
       <p>Não há solicitações que correspondam aos filtros selecionados.</p>
-      <button class="btn btn-primary" @click="$router.push('/solicitacoes/create')">
+      <button class="btn btn-primary" @click="abrirModalSolicitacao">
         <i class="fas fa-plus"></i>
         Criar Primeira Solicitação
       </button>
@@ -168,6 +168,173 @@
         Próxima
       </button>
     </div>
+
+    <!-- Modal de Nova Solicitação -->
+    <div v-if="showModalSolicitacao" class="modal-overlay" @click="fecharModalSolicitacao">
+      <div class="modal-container modal-solicitacao" @click.stop>
+        <div class="modal-header">
+          <h2>{{ isEdit ? 'Editar Solicitação' : 'Nova Solicitação' }}</h2>
+          <button @click="fecharModalSolicitacao" class="modal-close">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+          <form @submit.prevent="submitForm" class="solicitacao-form">
+            
+            <!-- 1. Setor -->
+            <div class="form-group">
+              <label for="setor">Setor *</label>
+              <select 
+                id="setor" 
+                v-model="form.setor_id" 
+                class="form-select" 
+                required
+                @change="onSetorChange"
+              >
+                <option value="">Selecione o setor</option>
+                <option 
+                  v-for="setor in setores" 
+                  :key="setor.id" 
+                  :value="setor.id"
+                >
+                  {{ setor.codigo }} - {{ setor.nome }} ({{ setor.total_ativos ?? 0 }})
+                </option>
+              </select>
+            </div>
+
+            <!-- 2. Ativo -->
+            <div class="form-group">
+              <label for="ativo">Ativo *</label>
+              <select 
+                id="ativo" 
+                v-model="form.ativo_id" 
+                class="form-select"
+                required
+                :disabled="!form.setor_id || ativosCarregando"
+              >
+                <option value="" v-if="!form.setor_id">Selecione primeiro o setor</option>
+                <option value="" v-else-if="ativosCarregando">Carregando ativos...</option>
+                <option value="" v-else-if="form.setor_id && !ativosCarregando && ativosFiltrados.length === 0">Nenhum ativo neste setor</option>
+                <template v-else>
+                  <option 
+                    v-for="ativo in ativosFiltrados" 
+                    :key="ativo.id" 
+                    :value="ativo.id"
+                  >
+                    {{ ativo.codigo }} - {{ ativo.nome }}
+                  </option>
+                </template>
+              </select>
+              <small class="form-help" v-if="form.setor_id && ativosFiltrados.length === 0 && !ativosCarregando">Cadastre um ativo para este setor antes de prosseguir</small>
+              <small class="form-help" v-else>Selecione o ativo relacionado à solicitação</small>
+            </div>
+
+            <!-- 3. Categoria -->
+            <div class="form-group">
+              <label for="categoria">Categoria *</label>
+              <select 
+                id="categoria" 
+                v-model="form.category_id" 
+                class="form-select" 
+                required
+                @change="onCategoryChange"
+              >
+                <option value="">Selecione a categoria</option>
+                <option 
+                  v-for="categoria in categorias" 
+                  :key="categoria.id" 
+                  :value="categoria.id"
+                >
+                  {{ categoria.nome }}
+                </option>
+              </select>
+            </div>
+
+            <!-- 4. Subcategoria -->
+            <div class="form-group">
+              <label for="subcategoria">Subcategoria *</label>
+              <select 
+                id="subcategoria" 
+                v-model="form.subcategory_id" 
+                class="form-select"
+                :disabled="!form.category_id"
+                required
+              >
+                <option value="">Selecione a subcategoria</option>
+                <option 
+                  v-for="subcategoria in subcategoriasDisponiveis" 
+                  :key="subcategoria.id" 
+                  :value="subcategoria.id"
+                >
+                  {{ subcategoria.nome }}
+                </option>
+              </select>
+            </div>
+
+            <!-- 5. Título -->
+            <div class="form-group">
+              <label for="titulo">Título da Solicitação *</label>
+              <input
+                id="titulo"
+                v-model="form.titulo"
+                type="text"
+                class="form-input"
+                required
+                placeholder="Descreva brevemente o problema ou necessidade"
+                maxlength="200"
+              />
+              <span class="char-count">{{ form.titulo.length }}/200</span>
+            </div>
+
+            <!-- 6. Descrição -->
+            <div class="form-group">
+              <label for="descricao">Descrição Detalhada *</label>
+              <textarea
+                id="descricao"
+                v-model="form.descricao"
+                class="form-textarea"
+                required
+                placeholder="Descreva detalhadamente o problema, necessidade ou solicitação..."
+                rows="4"
+                maxlength="1000"
+              ></textarea>
+              <span class="char-count">{{ form.descricao.length }}/1000</span>
+            </div>
+
+            <!-- 7. Prioridade -->
+            <div class="form-group">
+              <label for="prioridade">Prioridade *</label>
+              <select 
+                id="prioridade" 
+                v-model="form.prioridade" 
+                class="form-select" 
+                required
+              >
+                <option value="baixa">Baixa</option>
+                <option value="normal" selected>Normal</option>
+                <option value="alta">Alta</option>
+                <option value="urgente">Urgente</option>
+              </select>
+            </div>
+
+          </form>
+        </div>
+        
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" @click="fecharModalSolicitacao">
+            Cancelar
+          </button>
+          <button 
+            type="submit" 
+            class="btn btn-primary" 
+            @click="submitForm"
+            :disabled="salvando"
+          >
+            <i v-if="salvando" class="fas fa-spinner fa-spin"></i>
+            {{ salvando ? 'Salvando...' : (isEdit ? 'Salvar Alterações' : 'Criar Solicitação') }}
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -185,9 +352,38 @@ const { success, error } = useToast()
 const solicitacoes = ref([])
 const loading = ref(false)
 
+// Modal de Nova Solicitação
+const showModalSolicitacao = ref(false)
+const isEdit = ref(false)
+const salvando = ref(false)
+const ativosCarregando = ref(false)
+
+// Dados para o formulário
+const setores = ref([])
+const ativosFiltrados = ref([])
+const categorias = ref([])
+const subcategorias = ref([])
+
+// Formulário
+const form = reactive({
+  setor_id: '',
+  ativo_id: '',
+  category_id: '',
+  subcategory_id: '',
+  titulo: '',
+  descricao: '',
+  prioridade: 'normal'
+})
+
 // Verificar se o usuário é administrador
 const isAdmin = computed(() => {
   return authStore.user?.perfil === 'administrador'
+})
+
+// Computed para subcategorias disponíveis
+const subcategoriasDisponiveis = computed(() => {
+  if (!form.category_id) return []
+  return subcategorias.value.filter(sub => sub.category_id === form.category_id)
 })
 
 const filters = reactive({
@@ -251,6 +447,121 @@ const loadSolicitacoes = async () => {
 const changePage = (page) => {
   pagination.currentPage = page
   loadSolicitacoes()
+}
+
+// Métodos do Modal de Solicitação
+const abrirModalSolicitacao = () => {
+  showModalSolicitacao.value = true
+  isEdit.value = false
+  resetForm()
+  carregarDadosFormulario()
+}
+
+const fecharModalSolicitacao = () => {
+  showModalSolicitacao.value = false
+  resetForm()
+}
+
+const resetForm = () => {
+  Object.assign(form, {
+    setor_id: '',
+    ativo_id: '',
+    category_id: '',
+    subcategory_id: '',
+    titulo: '',
+    descricao: '',
+    prioridade: 'normal'
+  })
+  ativosFiltrados.value = []
+}
+
+const carregarDadosFormulario = async () => {
+  try {
+    // Carregar setores
+    const setorResponse = await api.get('/setores/ativos')
+    setores.value = setorResponse.data.data.setores
+
+  // Carregar categorias ativas com subcategorias
+  const catResponse = await api.get('/categories/active')
+  categorias.value = catResponse.data.data.categorias || []
+  // Extrair subcategorias agrupadas
+  subcategorias.value = categorias.value.flatMap(c => (c.subcategorias || []).map(s => ({ ...s, category_id: c.id })))
+  } catch (err) {
+    console.error('Erro ao carregar dados do formulário:', err)
+    error('Erro ao carregar dados do formulário')
+  }
+}
+
+const onSetorChange = async () => {
+  form.ativo_id = ''
+  ativosFiltrados.value = []
+  
+  if (!form.setor_id) return
+  
+  try {
+    ativosCarregando.value = true
+    const response = await api.get('/ativos', {
+      params: { setor_id: form.setor_id, limit: 200 }
+    })
+    if (response.data.success) {
+      ativosFiltrados.value = response.data.data.ativos || []
+    } else {
+      ativosFiltrados.value = []
+    }
+  } catch (err) {
+    console.error('Erro ao carregar ativos:', err)
+    error('Erro ao carregar ativos do setor')
+  } finally {
+    ativosCarregando.value = false
+  }
+}
+
+const onCategoryChange = () => {
+  form.subcategory_id = ''
+}
+
+const submitForm = async () => {
+  try {
+    salvando.value = true
+    
+    // Validação adicional
+    if (!form.category_id) {
+      error('Categoria obrigatória')
+      salvando.value = false
+      return
+    }
+    if (!form.subcategory_id) {
+      error('Subcategoria obrigatória')
+      salvando.value = false
+      return
+    }
+
+    const payload = {
+      titulo: form.titulo,
+      descricao: form.descricao,
+      category_id: form.category_id,
+      subcategory_id: form.subcategory_id,
+      prioridade: form.prioridade,
+      ativo_id: form.ativo_id,
+      setor_id: form.setor_id
+    }
+
+    if (isEdit.value) {
+      await api.put(`/solicitacoes/${form.id}`, payload)
+      success('Solicitação atualizada com sucesso!')
+    } else {
+      await api.post('/solicitacoes', payload)
+      success('Solicitação criada com sucesso!')
+    }
+
+    fecharModalSolicitacao()
+    loadSolicitacoes()
+  } catch (err) {
+    console.error('Erro ao salvar solicitação:', err)
+    error('Erro ao salvar solicitação')
+  } finally {
+    salvando.value = false
+  }
 }
 
 const formatStatus = (status) => {
@@ -602,6 +913,171 @@ onMounted(() => {
     flex-direction: column;
     gap: 1rem;
     align-items: stretch;
+  }
+}
+
+/* Modal de Solicitação */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-container {
+  background: var(--color-white);
+  border-radius: var(--border-radius-lg);
+  width: 95%;
+  max-width: 900px;
+  max-height: 95vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+}
+
+.modal-solicitacao {
+  width: 90%;
+  max-width: 800px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--color-light-gray);
+}
+
+.modal-header h2 {
+  color: var(--color-primary);
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--color-gray-dark);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--border-radius-md);
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  background: var(--color-light-gray);
+  color: var(--color-primary);
+}
+
+.modal-body {
+  padding: 2rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-footer {
+  padding: 1.5rem;
+  background: var(--color-background);
+  border-top: 1px solid var(--color-light-gray);
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.solicitacao-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: var(--color-gray-dark);
+  font-size: 0.9rem;
+}
+
+.form-input,
+.form-select,
+.form-textarea {
+  padding: 0.75rem 1rem;
+  border: 2px solid var(--color-light-gray);
+  border-radius: var(--border-radius-md);
+  font-size: 0.95rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  background: var(--color-white);
+  font-family: inherit;
+}
+
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(44, 62, 80, 0.1);
+}
+
+.form-select:disabled {
+  background: var(--color-background);
+  color: var(--color-gray);
+  cursor: not-allowed;
+}
+
+.form-textarea {
+  resize: vertical;
+  min-height: 100px;
+  font-family: inherit;
+}
+
+.form-help {
+  color: var(--color-gray);
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+}
+
+.char-count {
+  font-size: 0.8rem;
+  color: var(--color-gray);
+  text-align: right;
+}
+
+@media (max-width: 768px) {
+  .modal-solicitacao {
+    width: 95%;
+    margin: 1rem;
+  }
+  
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding: 1rem;
+  }
+  
+  .modal-footer {
+    flex-direction: column;
+  }
+  
+  .modal-footer .btn {
+    width: 100%;
   }
 }
 </style>

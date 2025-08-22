@@ -198,7 +198,7 @@ module.exports = (sequelize) => {
     },
     setor_id: {
       type: DataTypes.INTEGER,
-      allowNull: true,
+  allowNull: false,
       references: {
         model: 'setores',
         key: 'id'
@@ -301,6 +301,9 @@ module.exports = (sequelize) => {
     }
   }, {
     tableName: 'ativos',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     hooks: {
       beforeCreate: async (ativo) => {
         // Gerar código patrimonial automaticamente se não fornecido

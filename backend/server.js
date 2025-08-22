@@ -1,95 +1,63 @@
 require('dotenv').config();
+
 const express = require('express');
-const helmet = require('helmet');
 const cors = require('cors');
 const compression = require('compression');
+const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-
-const { sequelize } = require('./models');
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./config/logger');
-const { 
-  performanceMiddleware, 
-  accessLogMiddleware, 
-  errorCaptureMiddleware, 
-  memoryMonitorMiddleware 
-} = require('./middleware/performance');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
-// Middlewares de segurança
+// Configuração de segurança básica
 app.use(helmet());
+
+// Configuração do CORS
 app.use(cors({
-  origin: [
-    'http://localhost:3002',
-    'http://localhost:3003'
-  ],
+  origin: process.env.NODE_ENV === 'production' 
+    ? 'https://seu-dominio.com' 
+    : ['http://localhost:5173', 'http://localhost:3000', 'http://localhost:3002', 'http://localhost:3003'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
-app.use(compression());
 
-// Middlewares de performance e monitoramento
-app.use(memoryMonitorMiddleware);
-app.use(performanceMiddleware);
-app.use(accessLogMiddleware);
-
-// Rate limiting
+// Limite de requisições
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100 // máximo 100 requests por IP
+  max: 100 // limite por IP
 });
-app.use('/api/', limiter);
+app.use(limiter);
 
-// Middlewares parsing
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+// Compressão de respostas
+app.use(compression());
 
-// Servir arquivos estáticos
-app.use('/uploads', express.static('uploads'));
+// Parse de JSON
+app.use(express.json());
+
+// Logging de requisições
+app.use((req, res, next) => {
+  logger.info(`${req.method} ${req.url}`);
+  next();
+});
 
 // Rotas da API
 app.use('/api', routes);
 
-// Middleware de captura de erros (antes do errorHandler)
-app.use(errorCaptureMiddleware);
-
-// Middleware de tratamento de erros
+// Tratamento de erros
 app.use(errorHandler);
 
-// Inicialização do servidor
-async function startServer() {
-  try {
-    await sequelize.authenticate();
-    logger.info('Conexão com banco de dados estabelecida');
-    
-    if (process.env.NODE_ENV !== 'production') {
-      await sequelize.sync({ alter: false });
-    }
-    
-    const server = app.listen(PORT, '0.0.0.0', () => {
-      logger.info(`Servidor rodando na porta ${PORT}`);
-      console.log(`🚀 Servidor backend rodando em http://localhost:${PORT}`);
-      console.log(`📍 API disponível em http://localhost:${PORT}/api`);
-      console.log(`📋 Servidor ouvindo em todas as interfaces na porta ${PORT}`);
-    });
-    
-    server.on('error', (err) => {
-      console.error('❌ Erro no servidor:', err);
-      logger.error('Erro no servidor:', err);
-    });
-  } catch (error) {
-    logger.error('Erro ao inicializar servidor:', error);
-    process.exit(1);
-  }
+// Porta do servidor
+const PORT = process.env.PORT || 3001;
+
+// Iniciar servidor apenas se não estiver em modo de teste
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    logger.info(`🚀 Servidor rodando na porta ${PORT}`);
+    logger.info(`📝 Ambiente: ${process.env.NODE_ENV || 'development'}`);
+  });
 }
 
-startServer();
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM recebido. Fechando servidor...');
-  await sequelize.close();
-  process.exit(0);
-});
+module.exports = app;

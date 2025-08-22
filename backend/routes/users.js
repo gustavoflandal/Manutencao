@@ -1,8 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const UserController = require('../controllers/UserController');
-const { authenticate } = require('../middleware/auth');
-const { requireRole, requireOwnershipOrAdmin } = require('../middleware/permissions');
+const { authenticate, requireRole, requireOwnershipOrAdmin } = require('../middleware/permissions');
 
 // Rotas que requerem autenticação
 router.use(authenticate);
@@ -12,7 +11,7 @@ router.get('/profile', UserController.profile);
 router.put('/profile', UserController.updateProfile);
 
 // Listagem de usuários (apenas supervisores e administradores)
-router.get('/', requireRole('supervisor'), UserController.index);
+router.get('/', requireRole(['supervisor', 'administrador']), UserController.index);
 
 // Visualizar usuário específico (próprio perfil ou admin/supervisor)
 router.get('/:id', requireOwnershipOrAdmin(), UserController.show);

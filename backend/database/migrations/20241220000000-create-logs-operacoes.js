@@ -2,7 +2,13 @@ const { DataTypes } = require('sequelize');
 
 module.exports = {
   up: async (queryInterface, Sequelize) => {
-    await queryInterface.createTable('logs_operacoes', {
+    // Verificar se a tabela já existe para evitar erro de duplicidade
+    const tableExists = await queryInterface.sequelize.query("SHOW TABLES LIKE 'logs_operacoes'");
+    if (tableExists[0] && tableExists[0].length > 0) {
+      // Opcional: garantir que colunas obrigatórias existam (pular para índices)
+      // Prosseguir apenas criando índices ausentes
+    } else {
+      await queryInterface.createTable('logs_operacoes', {
       id: {
         type: DataTypes.INTEGER,
         primaryKey: true,
@@ -164,39 +170,28 @@ module.exports = {
         defaultValue: Sequelize.NOW
       }
     });
+    }
+    // Função auxiliar para criar índice se não existir
+    async function ensureIndex(name, fields) {
+      try {
+        await queryInterface.addIndex('logs_operacoes', fields, { name });
+      } catch (err) {
+        if (err && err.original && /Duplicate key name|already exists/i.test(err.original.message)) {
+          // Índice já existe, ignorar
+        } else {
+          throw err;
+        }
+      }
+    }
 
-    // Criar índices para melhor performance
-    await queryInterface.addIndex('logs_operacoes', ['usuario_id'], {
-      name: 'idx_logs_usuario_id'
-    });
-    
-    await queryInterface.addIndex('logs_operacoes', ['operacao'], {
-      name: 'idx_logs_operacao'
-    });
-    
-    await queryInterface.addIndex('logs_operacoes', ['modulo'], {
-      name: 'idx_logs_modulo'
-    });
-    
-    await queryInterface.addIndex('logs_operacoes', ['data_operacao'], {
-      name: 'idx_logs_data_operacao'
-    });
-    
-    await queryInterface.addIndex('logs_operacoes', ['recurso_tipo', 'recurso_id'], {
-      name: 'idx_logs_recurso'
-    });
-    
-    await queryInterface.addIndex('logs_operacoes', ['nivel_risco'], {
-      name: 'idx_logs_nivel_risco'
-    });
-    
-    await queryInterface.addIndex('logs_operacoes', ['sucesso'], {
-      name: 'idx_logs_sucesso'
-    });
-    
-    await queryInterface.addIndex('logs_operacoes', ['ip_address'], {
-      name: 'idx_logs_ip_address'
-    });
+    await ensureIndex('idx_logs_usuario_id', ['usuario_id']);
+    await ensureIndex('idx_logs_operacao', ['operacao']);
+    await ensureIndex('idx_logs_modulo', ['modulo']);
+    await ensureIndex('idx_logs_data_operacao', ['data_operacao']);
+    await ensureIndex('idx_logs_recurso', ['recurso_tipo', 'recurso_id']);
+    await ensureIndex('idx_logs_nivel_risco', ['nivel_risco']);
+    await ensureIndex('idx_logs_sucesso', ['sucesso']);
+    await ensureIndex('idx_logs_ip_address', ['ip_address']);
   },
 
   down: async (queryInterface, Sequelize) => {

@@ -1,4 +1,4 @@
-const { OrdemServico, Ativo, User, Solicitacao, Setor } = require('../models');
+const { OrdemServico, Ativo, User, Solicitacao, Setor, FmeaAnalysis } = require('../models');
 const logger = require('../config/logger');
 const { Op } = require('sequelize');
 
@@ -17,14 +17,13 @@ const OrdemServicoController = {
         data_inicio,
         data_fim
       } = req.query;
-
       const offset = (page - 1) * limit;
       const where = {};
       const include = [
         {
           model: Ativo,
           as: 'ativo',
-          attributes: ['id', 'nome', 'codigo_patrimonio', 'descricao']
+          attributes: ['id', 'nome', 'codigo_patrimonio']
         },
         {
           model: User,
@@ -40,22 +39,25 @@ const OrdemServicoController = {
           model: Solicitacao,
           as: 'solicitacao',
           required: false
+        },
+        {
+          model: FmeaAnalysis,
+          as: 'fmea',
+          required: false,
+          attributes: ['id', 'component', 'failure_mode', 'rpn']
         }
       ];
-
       // Filtros
       if (status) where.status = status;
       if (prioridade) where.prioridade = prioridade;
       if (tipo) where.tipo = tipo;
       if (responsavel_id) where.responsavel_id = responsavel_id;
-
       // Filtro por período
       if (data_inicio && data_fim) {
         where.data_inicio_prevista = {
           [Op.between]: [new Date(data_inicio), new Date(data_fim)]
         };
       }
-
       // Busca textual
       if (search) {
         where[Op.or] = [
@@ -64,7 +66,6 @@ const OrdemServicoController = {
           { observacoes_execucao: { [Op.like]: `%${search}%` } }
         ];
       }
-
       const result = await OrdemServico.findAndCountAll({
         where,
         include,
@@ -82,10 +83,8 @@ const OrdemServicoController = {
           ['created_at', 'DESC']
         ]
       });
-
       // Calcular estatísticas
-      const stats = await this.getStatistics();
-
+      const stats = await OrdemServicoController.getStatistics();
       res.json({
         success: true,
         data: result.rows,
@@ -95,7 +94,6 @@ const OrdemServicoController = {
         limit: parseInt(limit),
         statistics: stats
       });
-
     } catch (error) {
       logger.error('Erro ao listar ordens de serviço:', error);
       res.status(500).json({
@@ -110,7 +108,6 @@ const OrdemServicoController = {
   async show(req, res, next) {
     try {
       const { id } = req.params;
-
       const os = await OrdemServico.findByPk(id, {
         include: [
           {
@@ -132,22 +129,25 @@ const OrdemServicoController = {
             model: Solicitacao,
             as: 'solicitacao',
             required: false
+          },
+          {
+            model: FmeaAnalysis,
+            as: 'fmea',
+            required: false,
+            attributes: ['id', 'component', 'failure_mode', 'rpn', 'severity', 'occurrence', 'detection']
           }
         ]
       });
-
       if (!os) {
         return res.status(404).json({
           success: false,
           message: 'Ordem de serviço não encontrada'
         });
       }
-
       res.json({
         success: true,
         data: os
       });
-
     } catch (error) {
       logger.error('Erro ao buscar ordem de serviço:', error);
       next(error);
@@ -160,6 +160,7 @@ const OrdemServicoController = {
       const {
         ativo_id,
         solicitacao_id,
+        fmea_id,
         tipo,
         prioridade = 'normal',
         descricao_servico,
@@ -169,7 +170,6 @@ const OrdemServicoController = {
         responsavel_id,
         observacoes
       } = req.body;
-
       // Validações
       if (!ativo_id) {
         return res.status(400).json({
@@ -177,14 +177,12 @@ const OrdemServicoController = {
           message: 'Ativo é obrigatório'
         });
       }
-
       if (!tipo) {
         return res.status(400).json({
           success: false,
           message: 'Tipo da OS é obrigatório'
         });
       }
-
       // Verificar se o ativo existe
       const ativo = await Ativo.findByPk(ativo_id);
       if (!ativo) {
@@ -193,7 +191,6 @@ const OrdemServicoController = {
           message: 'Ativo não encontrado'
         });
       }
-
       // Verificar se o responsável existe (se informado)
       if (responsavel_id) {
         const responsavel = await User.findByPk(responsavel_id);
@@ -204,10 +201,24 @@ const OrdemServicoController = {
           });
         }
       }
-
+      // Verificar se o FMEA existe (se informado)
+      if (fmea_id) {
+        const fmea = await FmeaAnalysis.findByPk(fmea_id);
+        if (!fmea) {
+          return res.status(404).json({
+            success: false,
+            message: 'Análise FMEA não encontrada'
+          });
+        }
+        // Se o FMEA for crítico (RPN >= 200), definir prioridade como crítica
+        if (fmea.rpn >= 200) {
+          prioridade = 'critica';
+        }
+      }
       const os = await OrdemServico.create({
         ativo_id,
         solicitacao_id,
+        fmea_id,
         solicitante_id: req.user.id,
         responsavel_id,
         tipo,
@@ -219,28 +230,29 @@ const OrdemServicoController = {
         observacoes_execucao: observacoes,
         status: 'planejada'
       });
-
       // Buscar a OS criada com todos os relacionamentos
       const osCompleta = await OrdemServico.findByPk(os.id, {
         include: [
           { model: Ativo, as: 'ativo' },
           { model: User, as: 'responsavel', attributes: ['id', 'nome', 'email'] },
-          { model: User, as: 'solicitante', attributes: ['id', 'nome', 'email'] }
+          { model: User, as: 'solicitante', attributes: ['id', 'nome', 'email'] },
+          { 
+            model: FmeaAnalysis, 
+            as: 'fmea',
+            attributes: ['id', 'component', 'failure_mode', 'rpn']
+          }
         ]
       });
-
       logger.info(`OS ${os.numero_os} criada`, {
         os_id: os.id,
         ativo_id,
         solicitante_id: req.user.id
       });
-
       res.status(201).json({
         success: true,
         message: 'Ordem de serviço criada com sucesso',
         data: osCompleta
       });
-
     } catch (error) {
       logger.error('Erro ao criar ordem de serviço:', error);
       next(error);
@@ -261,7 +273,6 @@ const OrdemServicoController = {
         horas_planejadas,
         observacoes_execucao
       } = req.body;
-
       const os = await OrdemServico.findByPk(id);
       if (!os) {
         return res.status(404).json({
@@ -269,20 +280,17 @@ const OrdemServicoController = {
           message: 'Ordem de serviço não encontrada'
         });
       }
-
       // Verificar permissões (apenas responsável, supervisor ou admin pode editar)
       const canEdit = req.user.perfil === 'administrador' || 
                       req.user.perfil === 'supervisor' ||
                       os.responsavel_id === req.user.id ||
                       os.solicitante_id === req.user.id;
-
       if (!canEdit) {
         return res.status(403).json({
           success: false,
           message: 'Sem permissão para editar esta OS'
         });
       }
-
       await os.update({
         responsavel_id,
         tipo,
@@ -293,7 +301,6 @@ const OrdemServicoController = {
         horas_planejadas,
         observacoes_execucao
       });
-
       const osAtualizada = await OrdemServico.findByPk(id, {
         include: [
           { model: Ativo, as: 'ativo' },
@@ -301,18 +308,15 @@ const OrdemServicoController = {
           { model: User, as: 'solicitante', attributes: ['id', 'nome', 'email'] }
         ]
       });
-
       logger.info(`OS ${os.numero_os} atualizada`, {
         os_id: id,
         user_id: req.user.id
       });
-
       res.json({
         success: true,
         message: 'Ordem de serviço atualizada com sucesso',
         data: osAtualizada
       });
-
     } catch (error) {
       logger.error('Erro ao atualizar ordem de serviço:', error);
       next(error);
@@ -324,7 +328,6 @@ const OrdemServicoController = {
     try {
       const { id } = req.params;
       const { status, data_inicio_real, data_fim_real, horas_realizadas } = req.body;
-
       const os = await OrdemServico.findByPk(id);
       if (!os) {
         return res.status(404).json({
@@ -332,7 +335,6 @@ const OrdemServicoController = {
           message: 'Ordem de serviço não encontrada'
         });
       }
-
       // Validar transições de status
       const statusValidos = ['planejada', 'em_execucao', 'pausada', 'concluida', 'cancelada'];
       if (!statusValidos.includes(status)) {
@@ -341,7 +343,6 @@ const OrdemServicoController = {
           message: 'Status inválido'
         });
       }
-
       // Regras de transição
       const transicoesValidas = {
         'planejada': ['em_execucao', 'cancelada'],
@@ -350,43 +351,35 @@ const OrdemServicoController = {
         'concluida': [], // Não pode sair do status concluída
         'cancelada': ['planejada'] // Pode reabrir uma OS cancelada
       };
-
       if (!transicoesValidas[os.status].includes(status)) {
         return res.status(400).json({
           success: false,
           message: `Transição de ${os.status} para ${status} não permitida`
         });
       }
-
       const updateData = { status };
-
       // Controle automático de datas baseado no status
       if (status === 'em_execucao' && !os.data_inicio_real) {
         updateData.data_inicio_real = new Date();
       }
-
       if (status === 'concluida') {
         updateData.data_fim_real = data_fim_real || new Date();
         if (horas_realizadas) {
           updateData.horas_realizadas = horas_realizadas;
         }
       }
-
       await os.update(updateData);
-
       logger.info(`Status da OS ${os.numero_os} alterado para ${status}`, {
         os_id: id,
         old_status: os.status,
         new_status: status,
         user_id: req.user.id
       });
-
       res.json({
         success: true,
         message: `Status alterado para ${status}`,
         data: { id, status, ...updateData }
       });
-
     } catch (error) {
       logger.error('Erro ao alterar status da OS:', error);
       next(error);
@@ -397,7 +390,6 @@ const OrdemServicoController = {
   async destroy(req, res, next) {
     try {
       const { id } = req.params;
-
       const os = await OrdemServico.findByPk(id);
       if (!os) {
         return res.status(404).json({
@@ -405,7 +397,6 @@ const OrdemServicoController = {
           message: 'Ordem de serviço não encontrada'
         });
       }
-
       // Apenas admin ou supervisor pode deletar
       if (!['administrador', 'supervisor'].includes(req.user.perfil)) {
         return res.status(403).json({
@@ -413,7 +404,6 @@ const OrdemServicoController = {
           message: 'Sem permissão para deletar OS'
         });
       }
-
       // Não permitir deletar OS concluídas
       if (os.status === 'concluida') {
         return res.status(400).json({
@@ -421,19 +411,15 @@ const OrdemServicoController = {
           message: 'Não é possível deletar OS concluída'
         });
       }
-
       await os.destroy();
-
       logger.info(`OS ${os.numero_os} deletada`, {
         os_id: id,
         user_id: req.user.id
       });
-
       res.json({
         success: true,
         message: 'Ordem de serviço deletada com sucesso'
       });
-
     } catch (error) {
       logger.error('Erro ao deletar ordem de serviço:', error);
       next(error);
@@ -469,7 +455,6 @@ const OrdemServicoController = {
           }
         })
       ]);
-
       return {
         total,
         por_status: {
@@ -485,7 +470,6 @@ const OrdemServicoController = {
         },
         atrasadas: osAtrasadas
       };
-
     } catch (error) {
       logger.error('Erro ao calcular estatísticas:', error);
       return {};
@@ -496,21 +480,17 @@ const OrdemServicoController = {
   async relatorioprodutividade(req, res, next) {
     try {
       const { data_inicio, data_fim, responsavel_id } = req.query;
-
       const where = {
         status: 'concluida'
       };
-
       if (data_inicio || data_fim) {
         where.data_fim_real = {};
         if (data_inicio) where.data_fim_real[Op.gte] = new Date(data_inicio);
         if (data_fim) where.data_fim_real[Op.lte] = new Date(data_fim);
       }
-
       if (responsavel_id) {
         where.responsavel_id = responsavel_id;
       }
-
       const include = [
         { 
           model: Ativo, 
@@ -518,13 +498,11 @@ const OrdemServicoController = {
         },
         { model: User, as: 'responsavel', attributes: ['id', 'nome'] }
       ];
-
       const ossConcluidas = await OrdemServico.findAll({
         where,
         include,
         order: [['data_fim_real', 'DESC']]
       });
-
       // Calcular métricas
       const totalOS = ossConcluidas.length;
       const totalHorasRealizadas = ossConcluidas.reduce((acc, os) => acc + parseFloat(os.horas_realizadas || 0), 0);
@@ -532,7 +510,6 @@ const OrdemServicoController = {
       
       const mediaHorasPorOS = totalOS > 0 ? totalHorasRealizadas / totalOS : 0;
       const mediaCustoPorOS = totalOS > 0 ? totalCustos / totalOS : 0;
-
       // Agrupar por responsável
       const porResponsavel = {};
       ossConcluidas.forEach(os => {
@@ -550,7 +527,6 @@ const OrdemServicoController = {
           porResponsavel[nome].total_custos += parseFloat(os.custo_total || 0);
         }
       });
-
       res.json({
         success: true,
         data: {
@@ -565,7 +541,6 @@ const OrdemServicoController = {
           detalhes: ossConcluidas
         }
       });
-
     } catch (error) {
       logger.error('Erro ao gerar relatório de produtividade:', error);
       next(error);

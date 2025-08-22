@@ -41,7 +41,7 @@ module.exports = (sequelize) => {
       defaultValue: 0,
       validate: {
         min: 0,
-        max: 3 // Limita a 4 imagens (0-3)
+        max: 4 // Limita a 5 imagens (0-4)
       }
     }
   }, {

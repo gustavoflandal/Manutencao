@@ -1,4 +1,4 @@
-const { Solicitacao, User, Department, Category, SubCategory } = require('../models');
+const { Solicitacao, User, Department, Category, SubCategory, Ativo, Setor } = require('../models');
 const { Op } = require('sequelize');
 const logger = require('../config/logger');
 const { QueryOptimizer, TransactionHelper } = require('../utils/QueryOptimizer');
@@ -80,7 +80,8 @@ class SolicitacaoController {
       const order = QueryOptimizer.buildSafeOrder(orderBy, orderDirection, validOrderFields);
 
       // Buscar solicitações com cache para consultas repetidas
-      const cacheKey = `solicitacoes_${JSON.stringify({ whereClause, pagination, orderBy, orderDirection })}`;
+  const userContext = { userId: req.user?.id || null, perfil: req.user?.perfil || null };
+  const cacheKey = `solicitacoes_${JSON.stringify({ whereClause, pagination, orderBy, orderDirection, userContext })}`;
       
       const { count, rows: solicitacoes } = await QueryOptimizer.getCached(
         cacheKey,
@@ -186,29 +187,57 @@ class SolicitacaoController {
       const { 
         titulo, 
         descricao, 
-        categoria, 
-        subcategoria,
+        category_id,
+        subcategory_id,
         prioridade, 
         localizacao, 
         observacoes,
         data_prevista,
+        ativo_id,
+        setor_id,
+        // Manter compatibilidade com campos antigos
+        categoria,
+        subcategoria,
         department_id
       } = req.body;
 
       // Validações básicas
-      if (!titulo || !descricao || !categoria || !localizacao) {
+      if (!titulo || !descricao) {
         return res.status(400).json({
           success: false,
-          message: 'Título, descrição, categoria e localização são obrigatórios'
+          message: 'Título e descrição são obrigatórios'
         });
       }
 
-      // Verificar se categoria é válida
-      const categoriasValidas = ['predial', 'industrial', 'ti', 'infraestrutura'];
-      if (!categoriasValidas.includes(categoria)) {
+      // Validar categoria obrigatória
+      if (!category_id) {
         return res.status(400).json({
           success: false,
-          message: 'Categoria inválida'
+          message: 'Categoria é obrigatória'
+        });
+      }
+
+      // Validar subcategoria obrigatória
+      if (!subcategory_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Subcategoria é obrigatória'
+        });
+      }
+
+      // Validar ativo obrigatório
+      if (!ativo_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Ativo é obrigatório'
+        });
+      }
+
+      // Validar setor obrigatório  
+      if (!setor_id) {
+        return res.status(400).json({
+          success: false,
+          message: 'Setor é obrigatório'
         });
       }
 
@@ -229,14 +258,19 @@ class SolicitacaoController {
         const solicitacaoData = {
           titulo: titulo.trim(),
           descricao: descricao.trim(),
-          categoria,
-          subcategoria: subcategoria?.trim(),
+          category_id: category_id || null,
+          subcategory_id: subcategory_id || null,
           prioridade: prioridade || 'normal',
-          localizacao: localizacao.trim(),
+          localizacao: localizacao?.trim() || '',
           observacoes: observacoes?.trim(),
           data_prevista: data_prevista || null,
-          department_id: department_id || null,
-          solicitante_id: req.user.id
+          ativo_id: ativo_id,
+          setor_id: setor_id,
+          solicitante_id: req.user.id,
+          // Manter campos antigos para compatibilidade
+          categoria: categoria || null,
+          subcategoria: subcategoria?.trim() || null,
+          department_id: department_id || null
         };
 
         const solicitacao = await Solicitacao.create(solicitacaoData, { transaction });
@@ -252,17 +286,32 @@ class SolicitacaoController {
             {
               model: Department,
               as: 'department',
-              attributes: ['id', 'nome']
+              attributes: ['id', 'nome'],
+              required: false
             },
             {
               model: Category,
               as: 'category',
-              attributes: ['id', 'nome', 'cor', 'icone']
+              attributes: ['id', 'nome', 'cor', 'icone'],
+              required: false
             },
             {
               model: SubCategory,
               as: 'subcategory',
-              attributes: ['id', 'nome']
+              attributes: ['id', 'nome'],
+              required: false
+            },
+            {
+              model: Ativo,
+              as: 'ativo',
+              attributes: ['id', 'codigo', 'nome', 'marca', 'modelo'],
+              required: false
+            },
+            {
+              model: Setor,
+              as: 'setor',
+              attributes: ['id', 'codigo', 'nome'],
+              required: false
             }
           ]),
           transaction

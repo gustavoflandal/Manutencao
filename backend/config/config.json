@@ -3,23 +3,24 @@
     "username": "root",
     "password": "root",
     "database": "manutencao_db",
-    "host": "localhost",
+    "host": "127.0.0.1",
     "port": 3306,
-    "dialect": "mysql",
-    "logging": false
+    "dialect": "mysql"
   },
   "test": {
     "username": "root",
     "password": "root",
-    "database": "manutencao_db_test",
-    "host": "localhost",
+    "database": "manutencao_test",
+    "host": "127.0.0.1",
     "port": 3306,
-    "dialect": "mysql",
-    "logging": false
+    "dialect": "mysql"
   },
   "production": {
-    "use_env_variable": "DATABASE_URL",
-    "dialect": "mysql",
-    "logging": false
+    "username": "root",
+    "password": "root",
+    "database": "manutencao_prod",
+    "host": "127.0.0.1",
+    "port": 3306,
+    "dialect": "mysql"
   }
 }

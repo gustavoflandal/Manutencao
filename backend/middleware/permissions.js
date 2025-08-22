@@ -1,15 +1,66 @@
-const logger = require('../config/logger');
+const jwt = require('jsonwebtoken');
+const { User } = require('../models');
+const AuthService = require('../services/AuthService');
 
-// Hierarquia de perfis (do menor para o maior privilégio)
-const PERFIL_HIERARCHY = {
-  'solicitante': 1,
-  'tecnico': 2,
-  'supervisor': 3,
-  'administrador': 4
+/**
+ * Middleware de autenticação
+ */
+const authenticate = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token não fornecido'
+      });
+    }
+
+    const token = authHeader.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'Token não fornecido'
+      });
+    }
+
+    // Usar AuthService para verificar token com audience/issuer
+    const decoded = AuthService.verifyAccessToken(token);
+    const user = await User.findByPk(decoded.id);
+    
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Usuário não encontrado'
+      });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Token inválido'
+      });
+    }
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Token expirado'
+      });
+    }
+    return res.status(500).json({
+      success: false,
+      message: 'Erro ao autenticar usuário',
+      error: error.message
+    });
+  }
 };
 
-// Middleware para verificar permissões específicas
-const checkPermission = (permissionName) => {
+/**
+ * Middleware para verificar permissão específica
+ */
+const checkPermission = (permission) => {
   return async (req, res, next) => {
     try {
       if (!req.user) {
@@ -19,43 +70,69 @@ const checkPermission = (permissionName) => {
         });
       }
 
-      // Administradores têm acesso a tudo
+      // Administradores têm todas as permissões
       if (req.user.perfil === 'administrador') {
         return next();
       }
 
-      // Para outras permissões, verificar se o usuário tem a permissão específica
-      // Por enquanto, vamos permitir supervisores e técnicos terem acesso básico
-      const allowedRoles = ['supervisor', 'tecnico'];
-      
+      const userPermissions = await req.user.getPermissions();
+      const hasPermission = userPermissions.some(p => p.name === permission);
+
+      if (!hasPermission) {
+        return res.status(403).json({
+          success: false,
+          message: 'Sem permissão para acessar este recurso'
+        });
+      }
+
+      next();
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: 'Erro ao verificar permissão',
+        error: error.message
+      });
+    }
+  };
+};
+
+/**
+ * Middleware para verificar papel do usuário
+ */
+const requireRole = (roles) => {
+  return (req, res, next) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({
+          success: false,
+          message: 'Usuário não autenticado'
+        });
+      }
+
+      const allowedRoles = Array.isArray(roles) ? roles : [roles];
+
       if (!allowedRoles.includes(req.user.perfil)) {
-        logger.warn('Acesso negado por falta de permissão:', {
-          userId: req.user.id,
-          userRole: req.user.perfil,
-          requiredPermission: permissionName,
-          path: req.path,
-          method: req.method
-        });
-
         return res.status(403).json({
           success: false,
-          message: 'Sem permissão para acessar este recurso'
+          message: 'Acesso negado: perfil não autorizado'
         });
       }
 
       next();
     } catch (error) {
-      logger.error('Erro no middleware de permissões específicas:', error);
       return res.status(500).json({
         success: false,
-        message: 'Erro interno do servidor'
+        message: 'Erro ao verificar perfil do usuário',
+        error: error.message
       });
     }
   };
 };
 
-// Middleware para verificar se o usuário tem o perfil mínimo necessário
-const requireRole = (minRole) => {
+/**
+ * Middleware para verificar propriedade do recurso
+ */
+const requireOwnershipOrAdmin = () => {
   return (req, res, next) => {
     try {
       if (!req.user) {
@@ -65,101 +142,32 @@ const requireRole = (minRole) => {
         });
       }
 
-      // Se minRole é um array, usar requireAnyRole
-      if (Array.isArray(minRole)) {
-        return requireAnyRole(minRole)(req, res, next);
+      if (req.user.perfil === 'administrador') {
+        return next();
       }
 
-      const userRoleLevel = PERFIL_HIERARCHY[req.user.perfil];
-      const requiredRoleLevel = PERFIL_HIERARCHY[minRole];
-
-      if (!userRoleLevel) {
-        logger.error('Perfil de usuário inválido:', {
-          userRole: req.user.perfil,
-          userId: req.user.id
-        });
-        
-        return res.status(500).json({
-          success: false,
-          message: 'Erro de configuração de perfil de usuário'
-        });
-      }
-
-      if (!requiredRoleLevel) {
-        logger.error('Perfil requerido inválido:', {
-          requiredRole: minRole
-        });
-        
-        return res.status(500).json({
-          success: false,
-          message: 'Erro de configuração de permissões'
-        });
-      }
-
-      if (userRoleLevel < requiredRoleLevel) {
-        logger.warn('Acesso negado por falta de permissão:', {
-          userId: req.user.id,
-          userRole: req.user.perfil,
-          requiredRole: minRole,
-          path: req.path,
-          method: req.method
-        });
-
+      const resourceId = req.params.id;
+      if (req.user.id.toString() !== resourceId) {
         return res.status(403).json({
           success: false,
-          message: 'Sem permissão para acessar este recurso'
+          message: 'Acesso negado: recurso pertence a outro usuário'
         });
       }
 
       next();
     } catch (error) {
-      logger.error('Erro no middleware de permissões:', error);
       return res.status(500).json({
         success: false,
-        message: 'Erro interno do servidor'
+        message: 'Erro ao verificar propriedade do recurso',
+        error: error.message
       });
     }
   };
 };
 
-// Middleware para verificar se o usuário tem exatamente o perfil especificado
-const requireExactRole = (role) => {
-  return (req, res, next) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({
-          success: false,
-          message: 'Usuário não autenticado'
-        });
-      }
-
-      if (req.user.perfil !== role) {
-        logger.warn('Acesso negado por perfil incorreto:', {
-          userId: req.user.id,
-          userRole: req.user.perfil,
-          requiredRole: role,
-          path: req.path,
-          method: req.method
-        });
-
-        return res.status(403).json({
-          success: false,
-          message: 'Sem permissão para acessar este recurso'
-        });
-      }
-
-      next();
-    } catch (error) {
-      logger.error('Erro no middleware de permissões exatas:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Erro interno do servidor'
-      });
-    }
-  };
-};
-
-// Middleware para verificar se o usuário tem um dos perfis especificados
+/**
+ * Middleware para verificar se o usuário possui QUALQUER UM dos papéis especificados
+ */
 const requireAnyRole = (roles) => {
   return (req, res, next) => {
     try {
@@ -170,111 +178,31 @@ const requireAnyRole = (roles) => {
         });
       }
 
-      if (!Array.isArray(roles)) {
-        logger.error('requireAnyRole deve receber um array de perfis:', {
-          rolesReceived: roles,
-          rolesType: typeof roles
-        });
-        return res.status(500).json({
+      const allowedRoles = Array.isArray(roles) ? roles : [roles];
+
+      if (!allowedRoles.includes(req.user.perfil)) {
+        return res.status(403).json({
           success: false,
-          message: 'Erro de configuração de permissões'
+          message: 'Acesso negado: perfil não autorizado'
         });
       }
 
-      if (roles.includes(req.user.perfil)) {
-        return next();
-      }
-
-      logger.warn('Acesso negado por perfil não autorizado:', {
-        userId: req.user.id,
-        userRole: req.user.perfil,
-        allowedRoles: roles,
-        path: req.path,
-        method: req.method
-      });
-
-      return res.status(403).json({
-        success: false,
-        message: 'Sem permissão para acessar este recurso'
-      });
-
+      next();
     } catch (error) {
-      logger.error('Erro no middleware de múltiplas permissões:', error);
       return res.status(500).json({
         success: false,
-        message: 'Erro interno do servidor'
+        message: 'Erro ao verificar perfil do usuário',
+        error: error.message
       });
     }
   };
 };
 
-// Middleware para verificar se o usuário pode acessar seus próprios dados ou é admin
-const requireOwnershipOrAdmin = (userIdParam = 'id') => {
-  return (req, res, next) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({
-          success: false,
-          message: 'Usuário não autenticado'
-        });
-      }
-
-      const targetUserId = parseInt(req.params[userIdParam]);
-      const currentUserId = req.user.id;
-      const isAdmin = req.user.perfil === 'administrador';
-
-      // Admin pode acessar qualquer recurso
-      if (isAdmin) {
-        return next();
-      }
-
-      // Usuário só pode acessar seus próprios dados
-      if (targetUserId === currentUserId) {
-        return next();
-      }
-
-      logger.warn('Acesso negado por falta de propriedade:', {
-        userId: currentUserId,
-        targetUserId: targetUserId,
-        path: req.path,
-        method: req.method
-      });
-
-      return res.status(403).json({
-        success: false,
-        message: 'Você só pode acessar seus próprios dados'
-      });
-
-    } catch (error) {
-      logger.error('Erro no middleware de propriedade:', error);
-      return res.status(500).json({
-        success: false,
-        message: 'Erro interno do servidor'
-      });
-    }
-  };
-};
-
-// Função para verificar se um perfil tem permissão para executar uma ação
-const hasPermission = (userRole, requiredRole) => {
-  const userRoleLevel = PERFIL_HIERARCHY[userRole];
-  const requiredRoleLevel = PERFIL_HIERARCHY[requiredRole];
-  
-  return userRoleLevel && requiredRoleLevel && userRoleLevel >= requiredRoleLevel;
-};
-
-// Função para obter o nível hierárquico de um perfil
-const getRoleLevel = (role) => {
-  return PERFIL_HIERARCHY[role] || 0;
-};
-
+// Exportar todas as funções em um único objetonpm install
 module.exports = {
+  authenticate,
   checkPermission,
   requireRole,
-  requireExactRole,
   requireAnyRole,
-  requireOwnershipOrAdmin,
-  hasPermission,
-  getRoleLevel,
-  PERFIL_HIERARCHY
+  requireOwnershipOrAdmin
 };

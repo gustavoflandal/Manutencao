@@ -1,4 +1,4 @@
-const { QueryTypes } = require('sequelize');
+const { QueryTypes, Transaction } = require('sequelize');
 const { sequelize } = require('../models');
 const logger = require('../config/logger');
 
@@ -253,9 +253,10 @@ class QueryOptimizer {
 class TransactionHelper {
   
   static async executeInTransaction(callback, options = {}) {
+    const { isolationLevel, ...txOptions } = options;
     const transaction = await sequelize.transaction({
-      isolationLevel: options.isolationLevel || sequelize.Transaction.ISOLATION_LEVELS.READ_COMMITTED,
-      ...options
+      isolationLevel: isolationLevel || Transaction.ISOLATION_LEVELS.READ_COMMITTED,
+      ...txOptions
     });
     
     const startTime = Date.now();

@@ -362,14 +362,33 @@ class SetorController {
   // Buscar setores ativos (para dropdowns)
   async ativos(req, res) {
     try {
+      // Buscar setores ativos
       const setores = await Setor.buscarAtivos({
         attributes: ['id', 'codigo', 'nome', 'localizacao']
       });
 
+      // Obter contagem de ativos por setor em uma consulta agregada
+      const counts = await Ativo.findAll({
+        attributes: ['setor_id', [Ativo.sequelize.fn('COUNT', Ativo.sequelize.col('id')), 'total_ativos']],
+        where: { ativo: true, setor_id: { [Op.ne]: null } },
+        group: ['setor_id']
+      });
+
+      const mapCounts = counts.reduce((acc, row) => {
+        acc[row.get('setor_id')] = parseInt(row.get('total_ativos'), 10);
+        return acc;
+      }, {});
+
+      // Anexar contagem a cada setor (0 se não houver)
+      const setoresComContagem = setores.map(s => ({
+        ...s.toJSON(),
+        total_ativos: mapCounts[s.id] || 0
+      }));
+
       return res.json({
         success: true,
         message: 'Setores ativos listados',
-        data: { setores }
+        data: { setores: setoresComContagem }
       });
 
     } catch (error) {

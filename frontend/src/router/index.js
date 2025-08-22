@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import fmeaRoutes from './fmea.routes'
 import { useAuthStore } from '@/stores/auth'
 
 // Componentes de páginas
@@ -29,6 +30,7 @@ import Reports from '@/pages/Reports.vue'
 import Help from '@/pages/Help.vue'
 
 const routes = [
+  ...fmeaRoutes, // Rotas do módulo FMEA
   {
     path: '/',
     redirect: (to) => {
@@ -286,15 +288,26 @@ router.beforeEach(async (to, from, next) => {
   
   // Verificar se o usuário está autenticado
   if (!authStore.user && authStore.token) {
+    console.log('🔐 Router: Usuário sem dados mas com token, verificando...')
     try {
       await authStore.verifyToken()
+      console.log('🔐 Router: Token verificado com sucesso')
     } catch (error) {
+      console.log('🔐 Router: Falha na verificação do token, fazendo logout')
       authStore.logout()
     }
   }
 
+  console.log('🔐 Router: Estado atual:', {
+    isAuthenticated: authStore.isAuthenticated,
+    user: authStore.user,
+    token: !!authStore.token,
+    targetPath: to.path
+  })
+
   // Rota requer autenticação
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    console.log('🔐 Router: Rota requer auth mas usuário não autenticado, redirecionando para login')
     return next('/login')
   }
 

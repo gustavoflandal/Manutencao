@@ -121,9 +121,21 @@ module.exports = (sequelize) => {
     checklist: {
       type: DataTypes.JSON,
       comment: 'Checklist de atividades da OS'
+    },
+    fmea_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'fmea_analyses',
+        key: 'id'
+      },
+      comment: 'Referência à análise FMEA que originou a OS'
     }
   }, {
     tableName: 'ordens_servico',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     hooks: {
       beforeCreate: async (os) => {
         const count = await OrdemServico.count();
@@ -159,6 +171,11 @@ module.exports = (sequelize) => {
     OrdemServico.belongsTo(models.User, {
       foreignKey: 'responsavel_id',
       as: 'responsavel'
+    });
+
+    OrdemServico.belongsTo(models.FmeaAnalysis, {
+      foreignKey: 'fmea_id',
+      as: 'fmea'
     });
   };
 

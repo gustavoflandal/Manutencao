@@ -263,12 +263,12 @@ class CategoryController {
     }
   }
 
-  // Listar categorias ativas (para uso em selects)
+  // Listar categorias ativas (rota pública para selects) - inclui subcategorias ativas
   async listActive(req, res, next) {
     try {
       const categorias = await Category.findAll({
         where: { ativo: true },
-        attributes: ['id', 'nome', 'cor', 'icone'],
+        attributes: ['id', 'nome', 'descricao', 'cor', 'icone'],
         include: [
           {
             model: SubCategory,
@@ -284,26 +284,6 @@ class CategoryController {
       res.json({
         success: true,
         data: { categorias }
-      });
-
-    } catch (error) {
-      logger.error('Erro ao listar categorias ativas:', error);
-      next(error);
-    }
-  }
-
-  // Listar apenas categorias ativas (rota pública para selects)
-  async listActive(req, res, next) {
-    try {
-      const categorias = await Category.findAll({
-        where: { ativo: true },
-        attributes: ['id', 'nome', 'descricao', 'cor', 'icone'],
-        order: [['nome', 'ASC']]
-      });
-
-      res.json({
-        success: true,
-        categorias
       });
 
     } catch (error) {

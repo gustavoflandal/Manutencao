@@ -1,0 +1,2 @@
+Na tela de editar ativo tem de remover os elementos para captura de imagem.
+Na tela de gestão de ativos substituir a coluna localização por departamento

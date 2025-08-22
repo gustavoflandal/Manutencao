@@ -43,6 +43,22 @@ module.exports = (sequelize) => {
         key: 'id'
       }
     },
+    ativo_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false, // Agora obrigatório
+      references: {
+        model: 'ativos',
+        key: 'id'
+      }
+    },
+    setor_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'setores',
+        key: 'id'
+      }
+    },
     prioridade: {
       type: DataTypes.ENUM('baixa', 'normal', 'alta', 'critica'),
       defaultValue: 'normal'
@@ -53,7 +69,7 @@ module.exports = (sequelize) => {
     },
     localizacao: {
       type: DataTypes.STRING(200),
-      allowNull: false
+      allowNull: true // Tornando opcional pois nem sempre é necessário
     },
     observacoes: {
       type: DataTypes.TEXT
@@ -90,6 +106,9 @@ module.exports = (sequelize) => {
     }
   }, {
     tableName: 'solicitacoes',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
     hooks: {
       beforeCreate: async (solicitacao, options) => {
         // Se o número já foi definido, não sobrescrever
@@ -154,6 +173,18 @@ module.exports = (sequelize) => {
     Solicitacao.belongsTo(models.SubCategory, {
       foreignKey: 'subcategory_id',
       as: 'subcategory'
+    });
+
+    // Relação com Ativo
+    Solicitacao.belongsTo(models.Ativo, {
+      foreignKey: 'ativo_id',
+      as: 'ativo'
+    });
+
+    // Relação com Setor
+    Solicitacao.belongsTo(models.Setor, {
+      foreignKey: 'setor_id',
+      as: 'setor'
     });
 
     // Relação com Ordem de Serviço

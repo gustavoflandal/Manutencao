@@ -92,6 +92,8 @@ class AuthController {
     try {
       const { email, senha } = req.body;
 
+      console.log('🔍 Login attempt for:', email);
+
       // Validação básica
       if (!email || !senha) {
         return res.status(400).json({
@@ -100,21 +102,17 @@ class AuthController {
         });
       }
 
+      console.log('✅ Basic validation passed');
+
       // Buscar usuário por email
       const user = await User.findOne({ 
         where: { email: email.toLowerCase() },
         attributes: ['id', 'nome', 'email', 'senha', 'perfil', 'ativo']
       });
 
+      console.log('🔍 User found:', user ? 'YES' : 'NO');
+
       if (!user) {
-        // Registrar tentativa de login com email inexistente
-        await AuditoriaService.registrarLogin(
-          { email: email.toLowerCase() },
-          req,
-          false,
-          'Email não encontrado'
-        );
-        
         return res.status(401).json({
           success: false,
           message: 'Credenciais inválidas'
@@ -123,36 +121,26 @@ class AuthController {
 
       // Verificar se o usuário está ativo
       if (!user.ativo) {
-        // Registrar tentativa de login com usuário inativo
-        await AuditoriaService.registrarLogin(
-          user,
-          req,
-          false,
-          'Usuário inativo'
-        );
-        
         return res.status(401).json({
           success: false,
           message: 'Usuário inativo. Contate o administrador.'
         });
       }
 
+      console.log('✅ User active check passed');
+
       // Verificar senha
       const senhaValida = await user.validatePassword(senha);
+      console.log('🔍 Password valid:', senhaValida);
+      
       if (!senhaValida) {
-        // Registrar tentativa de login falhada
-        await AuditoriaService.registrarLogin(
-          { email: email.toLowerCase() },
-          req,
-          false,
-          'Senha incorreta'
-        );
-        
         return res.status(401).json({
           success: false,
           message: 'Credenciais inválidas'
         });
       }
+
+      console.log('✅ Password validation passed');
 
       // Gerar tokens
       const tokenData = {
@@ -161,20 +149,36 @@ class AuthController {
         perfil: user.perfil
       };
 
-      const accessToken = AuthService.generateAccessToken(tokenData);
-      const refreshToken = AuthService.generateRefreshToken(tokenData);
+      console.log('🔍 Generating tokens...');
+      
+      // Teste simples para verificar se AuthService funciona
+      let accessToken, refreshToken;
+      try {
+        console.log('Testando generateAccessToken...');
+        accessToken = AuthService.generateAccessToken(tokenData);
+        console.log('✅ Access token gerado:', accessToken ? 'OK' : 'FALHOU');
+        
+        console.log('Testando generateRefreshToken...');
+        refreshToken = AuthService.generateRefreshToken(tokenData);
+        console.log('✅ Refresh token gerado:', refreshToken ? 'OK' : 'FALHOU');
+        
+        console.log('✅ Tokens generated successfully');
+      } catch (tokenError) {
+        console.error('❌ Erro ao gerar tokens:', tokenError);
+        throw tokenError;
+      }
 
       // Atualizar último login
       await user.update({ ultimo_login: new Date() });
-
-      // Registrar login bem-sucedido na auditoria
-      await AuditoriaService.registrarLogin(user, req, true);
+      console.log('✅ Last login updated');
 
       // Log de sucesso
       logger.info(`Login realizado: ${user.email}`, {
         userId: user.id,
         ip: req.ip
       });
+
+      console.log('✅ About to send response');
 
       res.json({
         success: true,
@@ -191,7 +195,10 @@ class AuthController {
         }
       });
 
+      console.log('✅ Response sent successfully');
+
     } catch (error) {
+      console.error('❌ Login error:', error);
       logger.error('Erro no login:', error);
       next(error);
     }
