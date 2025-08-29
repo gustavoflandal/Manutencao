@@ -1,78 +1,96 @@
 const { Model, DataTypes } = require('sequelize');
-const sequelize = require('../config/database');
 
 class FmeaAction extends Model {
   static associate(models) {
-    FmeaAction.belongsTo(models.FmeaAnalysis, {
+    this.belongsTo(models.FmeaAnalysis, {
       foreignKey: 'fmea_id',
       as: 'analysis'
     });
-    
-    FmeaAction.belongsTo(models.User, {
-      foreignKey: 'completed_by',
-      as: 'completedByUser'
+
+    this.belongsTo(models.User, {
+      foreignKey: 'responsible_id',
+      as: 'responsible'
     });
   }
 }
 
-FmeaAction.init({
-  fmea_id: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    validate: {
-      notNull: { msg: 'FMEA é obrigatório' }
-    }
-  },
-  action_taken: {
-    type: DataTypes.TEXT,
-    allowNull: false,
-    validate: {
-      notEmpty: { msg: 'Ação tomada é obrigatória' }
-    }
-  },
-  new_severity: {
-    type: DataTypes.INTEGER,
-    validate: {
-      min: { args: 1, msg: 'Severidade deve ser entre 1 e 10' },
-      max: { args: 10, msg: 'Severidade deve ser entre 1 e 10' }
-    }
-  },
-  new_occurrence: {
-    type: DataTypes.INTEGER,
-    validate: {
-      min: { args: 1, msg: 'Ocorrência deve ser entre 1 e 10' },
-      max: { args: 10, msg: 'Ocorrência deve ser entre 1 e 10' }
-    }
-  },
-  new_detection: {
-    type: DataTypes.INTEGER,
-    validate: {
-      min: { args: 1, msg: 'Detecção deve ser entre 1 e 10' },
-      max: { args: 10, msg: 'Detecção deve ser entre 1 e 10' }
-    }
-  },
-  new_rpn: {
-    type: DataTypes.INTEGER
-  },
-  completed_date: DataTypes.DATE,
-  completed_by: {
-    type: DataTypes.INTEGER,
-    allowNull: false
-  }
-}, {
-  sequelize,
-  modelName: 'FmeaAction',
-  tableName: 'fmea_actions',
-  timestamps: true,
-  underscored: true,
-  hooks: {
-    beforeValidate: (action) => {
-      // Calcula o novo RPN após a ação
-      if (action.new_severity && action.new_occurrence && action.new_detection) {
-        action.new_rpn = action.new_severity * action.new_occurrence * action.new_detection;
+module.exports = (sequelize) => {
+  FmeaAction.init({
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true
+    },
+    fmea_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'fmea_analysis',
+        key: 'id'
       }
+    },
+    responsible_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: {
+        model: 'users',
+        key: 'id'
+      }
+    },
+    description: {
+      type: DataTypes.TEXT,
+      allowNull: false,
+      comment: 'Descrição da ação recomendada'
+    },
+    type: {
+      type: DataTypes.ENUM('preventive', 'corrective', 'detective'),
+      allowNull: false,
+      defaultValue: 'preventive',
+      comment: 'Tipo de ação'
+    },
+    priority: {
+      type: DataTypes.ENUM('low', 'medium', 'high', 'critical'),
+      allowNull: false,
+      defaultValue: 'medium',
+      comment: 'Prioridade da ação'
+    },
+    status: {
+      type: DataTypes.ENUM('pending', 'in_progress', 'completed', 'cancelled'),
+      allowNull: false,
+      defaultValue: 'pending',
+      comment: 'Status da ação'
+    },
+    due_date: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Data limite para conclusão'
+    },
+    completion_date: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      comment: 'Data de conclusão'
+    },
+    completion_notes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      comment: 'Observações sobre a conclusão'
+    },
+    effectiveness: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      validate: {
+        min: 1,
+        max: 10
+      },
+      comment: 'Eficácia da ação (1-10)'
     }
-  }
-});
+  }, {
+    sequelize,
+    tableName: 'fmea_actions',
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at'
+  });
 
-module.exports = FmeaAction;
+  return FmeaAction;
+};

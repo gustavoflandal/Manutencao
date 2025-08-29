@@ -23,7 +23,7 @@ const authenticate = async (req, res, next) => {
     }
 
     // Verificar e decodificar o token usando AuthService
-    const decoded = AuthService.verifyAccessToken(token);
+    const decoded = AuthService.verifyToken(token);
 
     // Buscar o usuário no banco
     const user = await User.findByPk(decoded.id);

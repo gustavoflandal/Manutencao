@@ -11,3 +11,4 @@ const authMock = (req, res, next) => {
 };
 
 module.exports = authMock;
+

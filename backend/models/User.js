@@ -1,8 +1,59 @@
-const { DataTypes } = require('sequelize');
+const { Model, DataTypes } = require('sequelize');
 const bcrypt = require('bcryptjs');
 
+class User extends Model {
+  static associate(models) {
+    this.belongsToMany(models.Permission, {
+      through: models.UserPermission,
+      foreignKey: 'user_id',
+      otherKey: 'permission_id',
+      as: 'permissions'
+    });
+
+    this.belongsTo(models.Department, {
+      foreignKey: 'department_id',
+      as: 'department'
+    });
+
+    this.hasMany(models.Solicitacao, {
+      foreignKey: 'solicitante_id',
+      as: 'solicitacoes'
+    });
+
+    this.hasMany(models.OrdemServico, {
+      foreignKey: 'solicitante_id',
+      as: 'ordens_servico_solicitadas'
+    });
+
+    this.hasMany(models.OrdemServico, {
+      foreignKey: 'responsavel_id',
+      as: 'ordens_servico_responsavel'
+    });
+
+    this.hasMany(models.FmeaAnalysis, {
+      foreignKey: 'analyst_id',
+      as: 'fmea_analyses'
+    });
+
+    this.hasMany(models.FmeaAction, {
+      foreignKey: 'responsible_id',
+      as: 'fmea_actions'
+    });
+  }
+
+  async validatePassword(senha) {
+    return bcrypt.compare(senha, this.senha);
+  }
+
+  toJSON() {
+    const values = { ...this.get() };
+    delete values.senha;
+    return values;
+  }
+}
+
 module.exports = (sequelize) => {
-  const User = sequelize.define('User', {
+  User.init({
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -51,6 +102,7 @@ module.exports = (sequelize) => {
       type: DataTypes.DATE
     }
   }, {
+    sequelize,
     tableName: 'users',
     timestamps: true,
     createdAt: 'created_at',
@@ -66,16 +118,6 @@ module.exports = (sequelize) => {
       }
     }
   });
-
-  User.prototype.validatePassword = async function(senha) {
-    return bcrypt.compare(senha, this.senha);
-  };
-
-  User.prototype.toJSON = function() {
-    const values = { ...this.get() };
-    delete values.senha;
-    return values;
-  };
 
   return User;
 };

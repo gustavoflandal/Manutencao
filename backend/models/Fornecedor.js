@@ -1,7 +1,106 @@
-const { DataTypes } = require('sequelize');
+const { Model, DataTypes } = require('sequelize');
+
+class Fornecedor extends Model {
+  static associate(models) {
+    // Um fornecedor pode fornecer muitos itens
+    this.hasMany(models.ItemEstoque, {
+      foreignKey: 'fornecedor_principal_id',
+      as: 'itens_fornecidos',
+      onDelete: 'SET NULL'
+    });
+
+    // Um fornecedor pode ter muitas movimentações de entrada
+    this.hasMany(models.MovimentacaoEstoque, {
+      foreignKey: 'fornecedor_id',
+      as: 'movimentacoes',
+      onDelete: 'SET NULL'
+    });
+  }
+
+  // Métodos da instância
+  getEnderecoCompleto() {
+    const partes = [
+      this.endereco,
+      this.numero,
+      this.complemento,
+      this.bairro,
+      this.cidade,
+      this.estado,
+      this.cep
+    ].filter(Boolean);
+    
+    return partes.join(', ');
+  }
+
+  getContatoCompleto() {
+    const contatos = [];
+    if (this.contato_principal) contatos.push(`Contato: ${this.contato_principal}`);
+    if (this.telefone_contato) contatos.push(`Tel: ${this.telefone_contato}`);
+    if (this.email_contato) contatos.push(`Email: ${this.email_contato}`);
+    return contatos.join(' | ');
+  }
+
+  // Métodos estáticos
+  static async buscarPorCodigo(codigo) {
+    return await this.findOne({
+      where: { 
+        codigo: codigo.toUpperCase(),
+        ativo: true 
+      },
+      include: [{
+        model: this.sequelize.models.ItemEstoque,
+        as: 'itens_fornecidos',
+        where: { ativo: true },
+        required: false
+      }]
+    });
+  }
+
+  static async buscarPorCnpj(cnpj) {
+    return await this.findOne({
+      where: { 
+        cnpj: cnpj,
+        ativo: true 
+      }
+    });
+  }
+
+  static async listarAtivos() {
+    return await this.findAll({
+      where: { ativo: true },
+      order: [['razao_social', 'ASC']],
+      include: [{
+        model: this.sequelize.models.ItemEstoque,
+        as: 'itens_fornecidos',
+        attributes: ['id'],
+        where: { ativo: true },
+        required: false
+      }]
+    });
+  }
+
+  static async estatisticas() {
+    const total = await this.count({ where: { ativo: true } });
+    const comItens = await this.count({
+      where: { ativo: true },
+      include: [{
+        model: this.sequelize.models.ItemEstoque,
+        as: 'itens_fornecidos',
+        where: { ativo: true },
+        required: true
+      }]
+    });
+
+    return {
+      total_fornecedores: total,
+      fornecedores_com_itens: comItens,
+      fornecedores_sem_itens: total - comItens
+    };
+  }
+}
 
 module.exports = (sequelize) => {
-  const Fornecedor = sequelize.define('Fornecedor', {
+  Fornecedor.init({
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -156,6 +255,7 @@ module.exports = (sequelize) => {
       defaultValue: true
     }
   }, {
+    sequelize,
     tableName: 'fornecedores',
     timestamps: true,
     createdAt: 'created_at',
@@ -203,104 +303,6 @@ module.exports = (sequelize) => {
       }
     }
   });
-
-  // Definir associações
-  Fornecedor.associate = (models) => {
-    // Um fornecedor pode fornecer muitos itens
-    Fornecedor.hasMany(models.ItemEstoque, {
-      foreignKey: 'fornecedor_principal_id',
-      as: 'itens_fornecidos',
-      onDelete: 'SET NULL'
-    });
-
-    // Um fornecedor pode ter muitas movimentações de entrada
-    Fornecedor.hasMany(models.MovimentacaoEstoque, {
-      foreignKey: 'fornecedor_id',
-      as: 'movimentacoes',
-      onDelete: 'SET NULL'
-    });
-  };
-
-  // Métodos da instância
-  Fornecedor.prototype.getEnderecoCompleto = function() {
-    const partes = [
-      this.endereco,
-      this.numero,
-      this.complemento,
-      this.bairro,
-      this.cidade,
-      this.estado,
-      this.cep
-    ].filter(Boolean);
-    
-    return partes.join(', ');
-  };
-
-  Fornecedor.prototype.getContatoCompleto = function() {
-    const contatos = [];
-    if (this.contato_principal) contatos.push(`Contato: ${this.contato_principal}`);
-    if (this.telefone_contato) contatos.push(`Tel: ${this.telefone_contato}`);
-    if (this.email_contato) contatos.push(`Email: ${this.email_contato}`);
-    return contatos.join(' | ');
-  };
-
-  // Métodos estáticos
-  Fornecedor.buscarPorCodigo = async function(codigo) {
-    return await this.findOne({
-      where: { 
-        codigo: codigo.toUpperCase(),
-        ativo: true 
-      },
-      include: [{
-        model: sequelize.models.ItemEstoque,
-        as: 'itens_fornecidos',
-        where: { ativo: true },
-        required: false
-      }]
-    });
-  };
-
-  Fornecedor.buscarPorCnpj = async function(cnpj) {
-    return await this.findOne({
-      where: { 
-        cnpj: cnpj,
-        ativo: true 
-      }
-    });
-  };
-
-  Fornecedor.listarAtivos = async function() {
-    return await this.findAll({
-      where: { ativo: true },
-      order: [['razao_social', 'ASC']],
-      include: [{
-        model: sequelize.models.ItemEstoque,
-        as: 'itens_fornecidos',
-        attributes: ['id'],
-        where: { ativo: true },
-        required: false
-      }]
-    });
-  };
-
-  Fornecedor.estatisticas = async function() {
-    const total = await this.count({ where: { ativo: true } });
-    const comItens = await this.count({
-      where: { ativo: true },
-      include: [{
-        model: sequelize.models.ItemEstoque,
-        as: 'itens_fornecidos',
-        where: { ativo: true },
-        required: true
-      }]
-    });
-
-    return {
-      total_fornecedores: total,
-      fornecedores_com_itens: comItens,
-      fornecedores_sem_itens: total - comItens
-    };
-  };
 
   return Fornecedor;
 };

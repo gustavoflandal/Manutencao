@@ -1,66 +1,116 @@
 const logger = require('../config/logger');
 
-const errorHandler = (err, req, res, next) => {
-  logger.error(err.stack);
+class AppError extends Error {
+  constructor(message, statusCode = 500, errors = []) {
+    super(message);
+    this.statusCode = statusCode;
+    this.errors = errors;
+    this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
+    this.isOperational = true;
 
-  // Erro de validação do Sequelize
-  if (err.name === 'SequelizeValidationError') {
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+const handleSequelizeError = (err) => {
+  if (err.name === 'SequelizeValidationError' || err.name === 'SequelizeUniqueConstraintError') {
     const errors = err.errors.map(error => ({
       field: error.path,
       message: error.message
     }));
-    return res.status(400).json({
-      success: false,
-      message: 'Erro de validação',
-      errors
-    });
+    return new AppError('Erro de validação', 400, errors);
   }
 
-  // Erro de unique constraint do Sequelize
-  if (err.name === 'SequelizeUniqueConstraintError') {
-    return res.status(400).json({
-      success: false,
-      message: 'Registro já existe',
-      field: err.errors[0]?.path
-    });
-  }
-
-  // Erro de foreign key do Sequelize
   if (err.name === 'SequelizeForeignKeyConstraintError') {
-    return res.status(400).json({
-      success: false,
-      message: 'Referência inválida'
-    });
+    return new AppError('Registro relacionado não encontrado', 400);
   }
 
-  // Erro JWT
-  if (err.name === 'JsonWebTokenError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Token inválido'
-    });
+  if (err.name === 'SequelizeDatabaseError') {
+    return new AppError('Erro no banco de dados', 500);
   }
 
-  if (err.name === 'TokenExpiredError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Token expirado'
-    });
-  }
+  return err;
+};
 
-  // Erro personalizado com status
-  if (err.statusCode) {
-    return res.status(err.statusCode).json({
-      success: false,
-      message: err.message
-    });
-  }
+const handleJWTError = () => new AppError('Token inválido. Por favor, faça login novamente.', 401);
 
-  // Erro interno do servidor
-  return res.status(500).json({
+const handleJWTExpiredError = () => new AppError('Seu token expirou. Por favor, faça login novamente.', 401);
+
+const handleMulterError = (err) => {
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return new AppError('Arquivo muito grande. Tamanho máximo permitido: 5MB', 400);
+  }
+  if (err.code === 'LIMIT_FILE_COUNT') {
+    return new AppError('Número máximo de arquivos excedido', 400);
+  }
+  if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+    return new AppError('Tipo de arquivo não permitido', 400);
+  }
+  return new AppError('Erro no upload de arquivo', 400);
+};
+
+const sendErrorDev = (err, res) => {
+  logger.error('Error 🔥', {
+    status: err.status,
+    error: err,
+    message: err.message,
+    stack: err.stack
+  });
+
+  res.status(err.statusCode).json({
     success: false,
-    message: process.env.NODE_ENV === 'development' ? err.message : 'Erro interno do servidor'
+    status: err.status,
+    message: err.message,
+    errors: err.errors,
+    error: err,
+    stack: err.stack
   });
 };
 
-module.exports = errorHandler;
+const sendErrorProd = (err, res) => {
+  logger.error('Error 🔥', {
+    status: err.status,
+    error: err,
+    message: err.message
+  });
+
+  // Erro operacional conhecido
+  if (err.isOperational) {
+    return res.status(err.statusCode).json({
+      success: false,
+      status: err.status,
+      message: err.message,
+      errors: err.errors
+    });
+  }
+
+  // Erro de programação ou desconhecido
+  return res.status(500).json({
+    success: false,
+    status: 'error',
+    message: 'Algo deu errado!'
+  });
+};
+
+const errorHandler = (err, req, res, next) => {
+  err.statusCode = err.statusCode || 500;
+  err.status = err.status || 'error';
+
+  // Tratamento de erros específicos
+  if (err.name === 'JsonWebTokenError') err = handleJWTError();
+  if (err.name === 'TokenExpiredError') err = handleJWTExpiredError();
+  if (err.name && err.name.startsWith('Sequelize')) err = handleSequelizeError(err);
+  if (err.name === 'MulterError') err = handleMulterError(err);
+
+  // Envio da resposta de erro
+  if (process.env.NODE_ENV === 'development') {
+    sendErrorDev(err, res);
+  } else {
+    sendErrorProd(err, res);
+  }
+};
+
+module.exports = {
+  AppError,
+  errorHandler
+};

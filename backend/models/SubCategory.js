@@ -1,7 +1,13 @@
-const { DataTypes } = require('sequelize');
+const { Model, DataTypes } = require('sequelize');
+
+class SubCategory extends Model {
+  static associate(models) {
+    // Associações são definidas no index.js para evitar duplicação
+  }
+}
 
 module.exports = (sequelize) => {
-  const SubCategory = sequelize.define('SubCategory', {
+  SubCategory.init({
     id: {
       type: DataTypes.INTEGER,
       autoIncrement: true,
@@ -49,6 +55,7 @@ module.exports = (sequelize) => {
       defaultValue: true
     }
   }, {
+    sequelize,
     tableName: 'subcategories',
     timestamps: true,
     underscored: true,
@@ -65,10 +72,6 @@ module.exports = (sequelize) => {
       }
     ]
   });
-
-  SubCategory.associate = (models) => {
-    // Associações são definidas no index.js para evitar duplicação
-  };
 
   return SubCategory;
 };

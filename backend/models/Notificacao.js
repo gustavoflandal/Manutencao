@@ -1,7 +1,41 @@
-const { DataTypes } = require('sequelize');
+const { Model, DataTypes } = require('sequelize');
+
+class Notificacao extends Model {
+  static associate(models) {
+    // Pertence a um destinatário (usuário)
+    this.belongsTo(models.User, {
+      foreignKey: 'user_id',
+      as: 'destinatario'
+    });
+
+    // Pertence a um remetente (usuário)
+    this.belongsTo(models.User, {
+      foreignKey: 'remetente_id',
+      as: 'remetente'
+    });
+  }
+
+  // Métodos de instância
+  async marcarComoLida() {
+    this.lida = true;
+    this.data_leitura = new Date();
+    return await this.save();
+  }
+
+  async marcarComoEntregue() {
+    this.entregue = true;
+    this.data_entrega = new Date();
+    return await this.save();
+  }
+
+  isExpirada() {
+    if (!this.data_expiracao) return false;
+    return new Date() > new Date(this.data_expiracao);
+  }
+}
 
 module.exports = (sequelize) => {
-  const Notificacao = sequelize.define('Notificacao', {
+  Notificacao.init({
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -156,6 +190,7 @@ module.exports = (sequelize) => {
       }
     }
   }, {
+    sequelize,
     tableName: 'notificacoes',
     timestamps: true,
     createdAt: 'created_at',
@@ -193,39 +228,6 @@ module.exports = (sequelize) => {
       }
     ]
   });
-
-  // Associações
-  Notificacao.associate = function(models) {
-    // Pertence a um destinatário (usuário)
-    Notificacao.belongsTo(models.User, {
-      foreignKey: 'user_id',
-      as: 'destinatario'
-    });
-
-    // Pertence a um remetente (usuário)
-    Notificacao.belongsTo(models.User, {
-      foreignKey: 'remetente_id',
-      as: 'remetente'
-    });
-  };
-
-  // Métodos de instância
-  Notificacao.prototype.marcarComoLida = async function() {
-    this.lida = true;
-    this.data_leitura = new Date();
-    return await this.save();
-  };
-
-  Notificacao.prototype.marcarComoEntregue = async function() {
-    this.entregue = true;
-    this.data_entrega = new Date();
-    return await this.save();
-  };
-
-  Notificacao.prototype.isExpirada = function() {
-    if (!this.data_expiracao) return false;
-    return new Date() > new Date(this.data_expiracao);
-  };
 
   return Notificacao;
 };

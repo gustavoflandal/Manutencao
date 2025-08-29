@@ -1,7 +1,16 @@
-const { DataTypes } = require('sequelize');
+const { Model, DataTypes } = require('sequelize');
+
+class Department extends Model {
+  static associate(models) {
+    this.hasMany(models.User, {
+      foreignKey: 'department_id',
+      as: 'usuarios'
+    });
+  }
+}
 
 module.exports = (sequelize) => {
-  const Department = sequelize.define('Department', {
+  Department.init({
     id: {
       type: DataTypes.INTEGER,
       autoIncrement: true,
@@ -57,6 +66,7 @@ module.exports = (sequelize) => {
       defaultValue: true
     }
   }, {
+    sequelize,
     tableName: 'departments',
     timestamps: true,
     underscored: true,
@@ -70,14 +80,6 @@ module.exports = (sequelize) => {
       }
     ]
   });
-
-  Department.associate = (models) => {
-    // Associação com usuários - um departamento pode ter muitos usuários
-    Department.hasMany(models.User, {
-      foreignKey: 'department_id',
-      as: 'usuarios'
-    });
-  };
 
   return Department;
 };

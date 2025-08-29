@@ -1,7 +1,18 @@
-const { DataTypes } = require('sequelize');
+const { Model, DataTypes } = require('sequelize');
+
+class Permission extends Model {
+  static associate(models) {
+    this.belongsToMany(models.User, {
+      through: models.UserPermission,
+      foreignKey: 'permission_id',
+      otherKey: 'user_id',
+      as: 'users'
+    });
+  }
+}
 
 module.exports = (sequelize) => {
-  const Permission = sequelize.define('Permission', {
+  Permission.init({
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -39,6 +50,7 @@ module.exports = (sequelize) => {
       comment: 'Se a permissão está ativa no sistema'
     }
   }, {
+    sequelize,
     tableName: 'permissions',
     timestamps: true,
     createdAt: 'created_at',

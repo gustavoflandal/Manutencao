@@ -1,7 +1,180 @@
-const { DataTypes, Op } = require('sequelize');
+const { Model, DataTypes, Op } = require('sequelize');
+
+class ItemEstoque extends Model {
+  static associate(models) {
+    // Pertence a uma categoria
+    this.belongsTo(models.CategoriaEstoque, {
+      foreignKey: 'categoria_id',
+      as: 'categoria',
+      onDelete: 'SET NULL'
+    });
+
+    // Pertence a um fornecedor principal
+    this.belongsTo(models.Fornecedor, {
+      foreignKey: 'fornecedor_principal_id',
+      as: 'fornecedor_principal',
+      onDelete: 'SET NULL'
+    });
+
+    // Pertence a um usuário que cadastrou
+    this.belongsTo(models.User, {
+      foreignKey: 'usuario_cadastro_id',
+      as: 'usuario_cadastro',
+      onDelete: 'SET NULL'
+    });
+
+    // Tem muitas movimentações
+    this.hasMany(models.MovimentacaoEstoque, {
+      foreignKey: 'item_estoque_id',
+      as: 'movimentacoes',
+      onDelete: 'CASCADE'
+    });
+  }
+
+  // Métodos da instância
+  isEstoqueBaixo() {
+    return parseFloat(this.quantidade_atual) <= parseFloat(this.quantidade_minima || 0);
+  }
+
+  isPontoReposicao() {
+    return parseFloat(this.quantidade_atual) <= parseFloat(this.ponto_reposicao || 0);
+  }
+
+  getStatusEstoque() {
+    if (this.isEstoqueBaixo()) return 'baixo';
+    if (this.isPontoReposicao()) return 'reposicao';
+    return 'normal';
+  }
+
+  async calcularGiro(dias = 30) {
+    const movimentacoes = await this.getMovimentacoes({
+      where: {
+        tipo_movimentacao: 'saida',
+        data_movimentacao: {
+          [Op.gte]: new Date(Date.now() - dias * 24 * 60 * 60 * 1000)
+        }
+      }
+    });
+
+    const totalSaidas = movimentacoes.reduce((total, mov) => total + parseFloat(mov.quantidade), 0);
+    const giro = totalSaidas / parseFloat(this.quantidade_atual || 1);
+    
+    return {
+      total_saidas: totalSaidas,
+      giro_dias: giro,
+      giro_mensal: giro * (30 / dias)
+    };
+  }
+
+  // Métodos estáticos
+  static async buscarPorCodigo(codigo) {
+    return await this.findOne({
+      where: { 
+        codigo: codigo.toUpperCase(),
+        ativo: true 
+      },
+      include: [
+        { model: this.sequelize.models.CategoriaEstoque, as: 'categoria' },
+        { model: this.sequelize.models.Fornecedor, as: 'fornecedor_principal' },
+        { model: this.sequelize.models.User, as: 'usuario_cadastro', attributes: ['id', 'nome'] }
+      ]
+    });
+  }
+
+  static async buscarPorCodigoBarras(codigoBarras) {
+    return await this.findOne({
+      where: { 
+        codigo_barras: codigoBarras,
+        ativo: true 
+      },
+      include: [
+        { model: this.sequelize.models.CategoriaEstoque, as: 'categoria' },
+        { model: this.sequelize.models.Fornecedor, as: 'fornecedor_principal' }
+      ]
+    });
+  }
+
+  static async listarEstoqueBaixo() {
+    return await this.findAll({
+      where: {
+        [Op.and]: [
+          { ativo: true },
+          this.sequelize.where(
+            this.sequelize.col('quantidade_atual'),
+            Op.lte,
+            this.sequelize.col('quantidade_minima')
+          )
+        ]
+      },
+      include: [
+        { model: this.sequelize.models.CategoriaEstoque, as: 'categoria' },
+        { model: this.sequelize.models.Fornecedor, as: 'fornecedor_principal' }
+      ],
+      order: [['nome', 'ASC']]
+    });
+  }
+
+  static async listarPontoReposicao() {
+    return await this.findAll({
+      where: {
+        [Op.and]: [
+          { ativo: true },
+          this.sequelize.where(
+            this.sequelize.col('quantidade_atual'),
+            Op.lte,
+            this.sequelize.col('ponto_reposicao')
+          )
+        ]
+      },
+      include: [
+        { model: this.sequelize.models.CategoriaEstoque, as: 'categoria' },
+        { model: this.sequelize.models.Fornecedor, as: 'fornecedor_principal' }
+      ],
+      order: [['nome', 'ASC']]
+    });
+  }
+
+  static async estatisticas() {
+    const total = await this.count({ where: { ativo: true } });
+    const estoqueBaixo = await this.count({
+      where: {
+        [Op.and]: [
+          { ativo: true },
+          this.sequelize.where(
+            this.sequelize.col('quantidade_atual'),
+            Op.lte,
+            this.sequelize.col('quantidade_minima')
+          )
+        ]
+      }
+    });
+    
+    const pontoReposicao = await this.count({
+      where: {
+        [Op.and]: [
+          { ativo: true },
+          this.sequelize.where(
+            this.sequelize.col('quantidade_atual'),
+            Op.lte,
+            this.sequelize.col('ponto_reposicao')
+          )
+        ]
+      }
+    });
+
+    const valorTotal = await this.sum('valor_total', { where: { ativo: true } });
+
+    return {
+      total_itens: total,
+      itens_estoque_baixo: estoqueBaixo,
+      itens_ponto_reposicao: pontoReposicao,
+      valor_total_estoque: parseFloat(valorTotal || 0)
+    };
+  }
+}
 
 module.exports = (sequelize) => {
-  const ItemEstoque = sequelize.define('ItemEstoque', {
+  ItemEstoque.init({
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -268,6 +441,7 @@ module.exports = (sequelize) => {
       defaultValue: true
     }
   }, {
+    sequelize,
     tableName: 'itens_estoque',
     timestamps: true,
     createdAt: 'created_at',
@@ -313,178 +487,6 @@ module.exports = (sequelize) => {
       }
     }
   });
-
-  // Definir associações
-  ItemEstoque.associate = (models) => {
-    // Pertence a uma categoria
-    ItemEstoque.belongsTo(models.CategoriaEstoque, {
-      foreignKey: 'categoria_id',
-      as: 'categoria',
-      onDelete: 'SET NULL'
-    });
-
-    // Pertence a um fornecedor principal
-    ItemEstoque.belongsTo(models.Fornecedor, {
-      foreignKey: 'fornecedor_principal_id',
-      as: 'fornecedor_principal',
-      onDelete: 'SET NULL'
-    });
-
-    // Pertence a um usuário que cadastrou
-    ItemEstoque.belongsTo(models.User, {
-      foreignKey: 'usuario_cadastro_id',
-      as: 'usuario_cadastro',
-      onDelete: 'SET NULL'
-    });
-
-    // Tem muitas movimentações
-    ItemEstoque.hasMany(models.MovimentacaoEstoque, {
-      foreignKey: 'item_estoque_id',
-      as: 'movimentacoes',
-      onDelete: 'CASCADE'
-    });
-  };
-
-  // Métodos da instância
-  ItemEstoque.prototype.isEstoqueBaixo = function() {
-    return parseFloat(this.quantidade_atual) <= parseFloat(this.quantidade_minima || 0);
-  };
-
-  ItemEstoque.prototype.isPontoReposicao = function() {
-    return parseFloat(this.quantidade_atual) <= parseFloat(this.ponto_reposicao || 0);
-  };
-
-  ItemEstoque.prototype.getStatusEstoque = function() {
-    if (this.isEstoqueBaixo()) return 'baixo';
-    if (this.isPontoReposicao()) return 'reposicao';
-    return 'normal';
-  };
-
-  ItemEstoque.prototype.calcularGiro = async function(dias = 30) {
-    const movimentacoes = await this.getMovimentacoes({
-      where: {
-        tipo_movimentacao: 'saida',
-        data_movimentacao: {
-          [Op.gte]: new Date(Date.now() - dias * 24 * 60 * 60 * 1000)
-        }
-      }
-    });
-
-    const totalSaidas = movimentacoes.reduce((total, mov) => total + parseFloat(mov.quantidade), 0);
-    const giro = totalSaidas / parseFloat(this.quantidade_atual || 1);
-    
-    return {
-      total_saidas: totalSaidas,
-      giro_dias: giro,
-      giro_mensal: giro * (30 / dias)
-    };
-  };
-
-  // Métodos estáticos
-  ItemEstoque.buscarPorCodigo = async function(codigo) {
-    return await this.findOne({
-      where: { 
-        codigo: codigo.toUpperCase(),
-        ativo: true 
-      },
-      include: [
-        { model: sequelize.models.CategoriaEstoque, as: 'categoria' },
-        { model: sequelize.models.Fornecedor, as: 'fornecedor_principal' },
-        { model: sequelize.models.User, as: 'usuario_cadastro', attributes: ['id', 'nome'] }
-      ]
-    });
-  };
-
-  ItemEstoque.buscarPorCodigoBarras = async function(codigoBarras) {
-    return await this.findOne({
-      where: { 
-        codigo_barras: codigoBarras,
-        ativo: true 
-      },
-      include: [
-        { model: sequelize.models.CategoriaEstoque, as: 'categoria' },
-        { model: sequelize.models.Fornecedor, as: 'fornecedor_principal' }
-      ]
-    });
-  };
-
-  ItemEstoque.listarEstoqueBaixo = async function() {
-    return await this.findAll({
-      where: {
-        [Op.and]: [
-          { ativo: true },
-          sequelize.where(
-            sequelize.col('quantidade_atual'),
-            Op.lte,
-            sequelize.col('quantidade_minima')
-          )
-        ]
-      },
-      include: [
-        { model: sequelize.models.CategoriaEstoque, as: 'categoria' },
-        { model: sequelize.models.Fornecedor, as: 'fornecedor_principal' }
-      ],
-      order: [['nome', 'ASC']]
-    });
-  };
-
-  ItemEstoque.listarPontoReposicao = async function() {
-    return await this.findAll({
-      where: {
-        [Op.and]: [
-          { ativo: true },
-          sequelize.where(
-            sequelize.col('quantidade_atual'),
-            Op.lte,
-            sequelize.col('ponto_reposicao')
-          )
-        ]
-      },
-      include: [
-        { model: sequelize.models.CategoriaEstoque, as: 'categoria' },
-        { model: sequelize.models.Fornecedor, as: 'fornecedor_principal' }
-      ],
-      order: [['nome', 'ASC']]
-    });
-  };
-
-  ItemEstoque.estatisticas = async function() {
-    const total = await this.count({ where: { ativo: true } });
-    const estoqueBaixo = await this.count({
-      where: {
-        [Op.and]: [
-          { ativo: true },
-          sequelize.where(
-            sequelize.col('quantidade_atual'),
-            Op.lte,
-            sequelize.col('quantidade_minima')
-          )
-        ]
-      }
-    });
-    
-    const pontoReposicao = await this.count({
-      where: {
-        [Op.and]: [
-          { ativo: true },
-          sequelize.where(
-            sequelize.col('quantidade_atual'),
-            Op.lte,
-            sequelize.col('ponto_reposicao')
-          )
-        ]
-      }
-    });
-
-    const valorTotal = await this.sum('valor_total', { where: { ativo: true } });
-
-    return {
-      total_itens: total,
-      itens_estoque_baixo: estoqueBaixo,
-      itens_ponto_reposicao: pontoReposicao,
-      valor_total_estoque: parseFloat(valorTotal || 0)
-    };
-  };
 
   return ItemEstoque;
 };

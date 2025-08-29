@@ -1,7 +1,31 @@
-const { DataTypes } = require('sequelize');
+const { Model, DataTypes } = require('sequelize');
+
+class UserPermission extends Model {
+  static associate(models) {
+    this.belongsTo(models.User, {
+      foreignKey: 'user_id',
+      as: 'user'
+    });
+
+    this.belongsTo(models.Permission, {
+      foreignKey: 'permission_id',
+      as: 'permission'
+    });
+
+    this.belongsTo(models.User, {
+      foreignKey: 'granted_by',
+      as: 'grantor'
+    });
+
+    this.belongsTo(models.User, {
+      foreignKey: 'revoked_by',
+      as: 'revoker'
+    });
+  }
+}
 
 module.exports = (sequelize) => {
-  const UserPermission = sequelize.define('UserPermission', {
+  UserPermission.init({
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -13,8 +37,7 @@ module.exports = (sequelize) => {
       references: {
         model: 'users',
         key: 'id'
-      },
-      onDelete: 'CASCADE'
+      }
     },
     permission_id: {
       type: DataTypes.INTEGER,
@@ -22,8 +45,7 @@ module.exports = (sequelize) => {
       references: {
         model: 'permissions',
         key: 'id'
-      },
-      onDelete: 'CASCADE'
+      }
     },
     granted_by: {
       type: DataTypes.INTEGER,
@@ -32,24 +54,35 @@ module.exports = (sequelize) => {
         model: 'users',
         key: 'id'
       },
-      comment: 'Usuário que concedeu a permissão'
+      comment: 'ID do usuário que concedeu a permissão'
     },
     granted_at: {
       type: DataTypes.DATE,
+      allowNull: false,
       defaultValue: DataTypes.NOW,
-      comment: 'Data e hora quando a permissão foi concedida'
+      comment: 'Data/hora em que a permissão foi concedida'
     },
-    expires_at: {
+    revoked_by: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: 'users',
+        key: 'id'
+      },
+      comment: 'ID do usuário que revogou a permissão'
+    },
+    revoked_at: {
       type: DataTypes.DATE,
       allowNull: true,
-      comment: 'Data de expiração da permissão (opcional)'
+      comment: 'Data/hora em que a permissão foi revogada'
     },
     active: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,
-      comment: 'Se esta permissão específica está ativa'
+      comment: 'Se a permissão está ativa'
     }
   }, {
+    sequelize,
     tableName: 'user_permissions',
     timestamps: true,
     createdAt: 'created_at',

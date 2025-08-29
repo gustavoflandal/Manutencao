@@ -231,3 +231,4 @@ onMounted(() => {
   @apply space-y-4;
 }
 </style>
+

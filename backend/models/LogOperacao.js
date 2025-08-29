@@ -1,7 +1,93 @@
-const { DataTypes, Op } = require('sequelize');
+const { Model, DataTypes, Op } = require('sequelize');
+
+class LogOperacao extends Model {
+  static associate(models) {
+    this.belongsTo(models.User, {
+      foreignKey: 'usuario_id',
+      as: 'usuario',
+      onDelete: 'SET NULL'
+    });
+  }
+
+  // Métodos estáticos para facilitar o uso
+  static async criarLog(dados) {
+    try {
+      return await this.create(dados);
+    } catch (error) {
+      console.error('Erro ao criar log de operação:', error);
+      // Não quebrar a aplicação por erro de log
+      return null;
+    }
+  }
+
+  static async buscarPorUsuario(usuarioId, limite = 100) {
+    return await this.findAll({
+      where: { usuario_id: usuarioId },
+      include: [{ model: this.sequelize.models.User, as: 'usuario', attributes: ['nome', 'email'] }],
+      order: [['data_operacao', 'DESC']],
+      limit: limite
+    });
+  }
+
+  static async buscarPorModulo(modulo, limite = 100) {
+    return await this.findAll({
+      where: { modulo },
+      include: [{ model: this.sequelize.models.User, as: 'usuario', attributes: ['nome', 'email'] }],
+      order: [['data_operacao', 'DESC']],
+      limit: limite
+    });
+  }
+
+  static async buscarOperacoesCriticas(limite = 50) {
+    return await this.findAll({
+      where: { 
+        nivel_risco: ['ALTO', 'CRITICO'] 
+      },
+      include: [{ model: this.sequelize.models.User, as: 'usuario', attributes: ['nome', 'email'] }],
+      order: [['data_operacao', 'DESC']],
+      limit: limite
+    });
+  }
+
+  static async relatorioAuditoria(filtros = {}) {
+    const where = {};
+    
+    if (filtros.dataInicio) {
+      where.data_operacao = { [Op.gte]: filtros.dataInicio };
+    }
+    
+    if (filtros.dataFim) {
+      where.data_operacao = where.data_operacao || {};
+      where.data_operacao[Op.lte] = filtros.dataFim;
+    }
+    
+    if (filtros.usuario_id) {
+      where.usuario_id = filtros.usuario_id;
+    }
+    
+    if (filtros.modulo) {
+      where.modulo = filtros.modulo;
+    }
+    
+    if (filtros.operacao) {
+      where.operacao = filtros.operacao;
+    }
+    
+    if (filtros.nivel_risco) {
+      where.nivel_risco = filtros.nivel_risco;
+    }
+
+    return await this.findAll({
+      where,
+      include: [{ model: this.sequelize.models.User, as: 'usuario', attributes: ['nome', 'email'] }],
+      order: [['data_operacao', 'DESC']],
+      limit: filtros.limite || 1000
+    });
+  }
+}
 
 module.exports = (sequelize) => {
-  const LogOperacao = sequelize.define('LogOperacao', {
+  LogOperacao.init({
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -148,6 +234,7 @@ module.exports = (sequelize) => {
       comment: 'Data e hora da operação'
     }
   }, {
+    sequelize,
     tableName: 'logs_operacoes',
     timestamps: false,  // Desabilitar timestamps automáticos pois usamos data_operacao
     underscored: false, // Sobrescrever configuração global
@@ -213,91 +300,6 @@ module.exports = (sequelize) => {
       }
     }
   });
-
-  // Associações
-  LogOperacao.associate = (models) => {
-    LogOperacao.belongsTo(models.User, {
-      foreignKey: 'usuario_id',
-      as: 'usuario',
-      onDelete: 'SET NULL'
-    });
-  };
-
-  // Métodos estáticos para facilitar o uso
-  LogOperacao.criarLog = async function(dados) {
-    try {
-      return await this.create(dados);
-    } catch (error) {
-      console.error('Erro ao criar log de operação:', error);
-      // Não quebrar a aplicação por erro de log
-      return null;
-    }
-  };
-
-  LogOperacao.buscarPorUsuario = async function(usuarioId, limite = 100) {
-    return await this.findAll({
-      where: { usuario_id: usuarioId },
-      include: [{ model: models.User, as: 'usuario', attributes: ['nome', 'email'] }],
-      order: [['data_operacao', 'DESC']],
-      limit: limite
-    });
-  };
-
-  LogOperacao.buscarPorModulo = async function(modulo, limite = 100) {
-    return await this.findAll({
-      where: { modulo },
-      include: [{ model: models.User, as: 'usuario', attributes: ['nome', 'email'] }],
-      order: [['data_operacao', 'DESC']],
-      limit: limite
-    });
-  };
-
-  LogOperacao.buscarOperacoesCriticas = async function(limite = 50) {
-    return await this.findAll({
-      where: { 
-        nivel_risco: ['ALTO', 'CRITICO'] 
-      },
-      include: [{ model: models.User, as: 'usuario', attributes: ['nome', 'email'] }],
-      order: [['data_operacao', 'DESC']],
-      limit: limite
-    });
-  };
-
-  LogOperacao.relatorioAuditoria = async function(filtros = {}) {
-    const where = {};
-    
-    if (filtros.dataInicio) {
-      where.data_operacao = { [Op.gte]: filtros.dataInicio };
-    }
-    
-    if (filtros.dataFim) {
-      where.data_operacao = where.data_operacao || {};
-      where.data_operacao[Op.lte] = filtros.dataFim;
-    }
-    
-    if (filtros.usuario_id) {
-      where.usuario_id = filtros.usuario_id;
-    }
-    
-    if (filtros.modulo) {
-      where.modulo = filtros.modulo;
-    }
-    
-    if (filtros.operacao) {
-      where.operacao = filtros.operacao;
-    }
-    
-    if (filtros.nivel_risco) {
-      where.nivel_risco = filtros.nivel_risco;
-    }
-
-    return await this.findAll({
-      where,
-      include: [{ model: models.User, as: 'usuario', attributes: ['nome', 'email'] }],
-      order: [['data_operacao', 'DESC']],
-      limit: filtros.limite || 1000
-    });
-  };
 
   return LogOperacao;
 };

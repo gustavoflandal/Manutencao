@@ -1,7 +1,179 @@
-const { DataTypes, Op } = require('sequelize');
+const { Model, DataTypes, Op } = require('sequelize');
+
+class MovimentacaoEstoque extends Model {
+  static associate(models) {
+    // Pertence a um item de estoque
+    this.belongsTo(models.ItemEstoque, {
+      foreignKey: 'item_estoque_id',
+      as: 'item_estoque',
+      onDelete: 'RESTRICT'
+    });
+
+    // Pertence a um fornecedor (para entradas)
+    this.belongsTo(models.Fornecedor, {
+      foreignKey: 'fornecedor_id',
+      as: 'fornecedor',
+      onDelete: 'SET NULL'
+    });
+
+    // Pertence a uma ordem de serviço (para saídas)
+    this.belongsTo(models.OrdemServico, {
+      foreignKey: 'ordem_servico_id',
+      as: 'ordem_servico',
+      onDelete: 'SET NULL'
+    });
+
+    // Pertence a um plano preventivo (para saídas)
+    this.belongsTo(models.PlanoPreventivo, {
+      foreignKey: 'plano_preventivo_id',
+      as: 'plano_preventivo',
+      onDelete: 'SET NULL'
+    });
+
+    // Pertence a setores (origem e destino)
+    this.belongsTo(models.Setor, {
+      foreignKey: 'setor_origem_id',
+      as: 'setor_origem',
+      onDelete: 'SET NULL'
+    });
+
+    this.belongsTo(models.Setor, {
+      foreignKey: 'setor_destino_id',
+      as: 'setor_destino',
+      onDelete: 'SET NULL'
+    });
+
+    // Pertence a usuários
+    this.belongsTo(models.User, {
+      foreignKey: 'usuario_id',
+      as: 'usuario',
+      onDelete: 'RESTRICT'
+    });
+
+    this.belongsTo(models.User, {
+      foreignKey: 'aprovado_por_id',
+      as: 'aprovado_por',
+      onDelete: 'SET NULL'
+    });
+  }
+
+  // Métodos da instância
+  async atualizarEstoqueItem() {
+    const item = await this.getItem_estoque();
+    if (!item) return;
+
+    let novaQuantidade;
+    if (this.operacao === 'soma') {
+      novaQuantidade = parseFloat(item.quantidade_atual) + parseFloat(this.quantidade);
+    } else {
+      novaQuantidade = parseFloat(item.quantidade_atual) - parseFloat(this.quantidade);
+    }
+
+    // Garantir que a quantidade não seja negativa
+    novaQuantidade = Math.max(0, novaQuantidade);
+
+    // Atualizar preço médio se for uma entrada com preço
+    let novoPrecoMedio = item.preco_medio;
+    if (this.tipo_movimentacao === 'entrada' && this.preco_unitario) {
+      const quantidadeAnterior = parseFloat(item.quantidade_atual);
+      const precoAnterior = parseFloat(item.preco_medio || 0);
+      const quantidadeEntrada = parseFloat(this.quantidade);
+      const precoEntrada = parseFloat(this.preco_unitario);
+
+      if (quantidadeAnterior > 0) {
+        // Calcular preço médio ponderado
+        const valorAnterior = quantidadeAnterior * precoAnterior;
+        const valorEntrada = quantidadeEntrada * precoEntrada;
+        const quantidadeTotal = quantidadeAnterior + quantidadeEntrada;
+        novoPrecoMedio = (valorAnterior + valorEntrada) / quantidadeTotal;
+      } else {
+        // Se não havia estoque, usar o preço da entrada
+        novoPrecoMedio = precoEntrada;
+      }
+    }
+
+    // Calcular novo valor total
+    const novoValorTotal = novaQuantidade * parseFloat(novoPrecoMedio || 0);
+
+    await item.update({
+      quantidade_atual: novaQuantidade,
+      preco_medio: novoPrecoMedio,
+      valor_total: novoValorTotal
+    });
+  }
+
+  isVencida() {
+    if (!this.data_validade) return false;
+    return new Date() > new Date(this.data_validade);
+  }
+
+  diasParaVencimento() {
+    if (!this.data_validade) return null;
+    const hoje = new Date();
+    const vencimento = new Date(this.data_validade);
+    const diferenca = vencimento - hoje;
+    return Math.ceil(diferenca / (1000 * 60 * 60 * 24));
+  }
+
+  // Métodos estáticos
+  static async buscarPorNumero(numero) {
+    return await this.findOne({
+      where: { numero_movimentacao: numero },
+      include: [
+        { model: this.sequelize.models.ItemEstoque, as: 'item_estoque' },
+        { model: this.sequelize.models.Fornecedor, as: 'fornecedor' },
+        { model: this.sequelize.models.User, as: 'usuario', attributes: ['id', 'nome'] },
+        { model: this.sequelize.models.User, as: 'aprovado_por', attributes: ['id', 'nome'] }
+      ]
+    });
+  }
+
+  static async relatorioPorPeriodo(dataInicio, dataFim, filtros = {}) {
+    const where = {
+      data_movimentacao: {
+        [Op.between]: [dataInicio, dataFim]
+      },
+      ...filtros
+    };
+
+    return await this.findAll({
+      where,
+      include: [
+        { model: this.sequelize.models.ItemEstoque, as: 'item_estoque' },
+        { model: this.sequelize.models.Fornecedor, as: 'fornecedor' },
+        { model: this.sequelize.models.User, as: 'usuario', attributes: ['id', 'nome'] }
+      ],
+      order: [['data_movimentacao', 'DESC']]
+    });
+  }
+
+  static async estatisticasPorTipo(dataInicio, dataFim) {
+    const movimentacoes = await this.findAll({
+      where: {
+        data_movimentacao: {
+          [Op.between]: [dataInicio, dataFim]
+        }
+      },
+      attributes: [
+        'tipo_movimentacao',
+        [this.sequelize.fn('COUNT', this.sequelize.col('id')), 'total_movimentacoes'],
+        [this.sequelize.fn('SUM', this.sequelize.col('quantidade')), 'total_quantidade'],
+        [this.sequelize.fn('SUM', this.sequelize.col('valor_total')), 'total_valor']
+      ],
+      group: ['tipo_movimentacao']
+    });
+
+    return movimentacoes.map(mov => ({
+      tipo: mov.tipo_movimentacao,
+      total_movimentacoes: parseInt(mov.dataValues.total_movimentacoes),
+      total_quantidade: parseFloat(mov.dataValues.total_quantidade || 0),
+      total_valor: parseFloat(mov.dataValues.total_valor || 0)
+    }));
+  }
+}
 
 module.exports = (sequelize) => {
-  const MovimentacaoEstoque = sequelize.define('MovimentacaoEstoque', {
+  MovimentacaoEstoque.init({
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -233,6 +405,7 @@ module.exports = (sequelize) => {
       }
     }
   }, {
+    sequelize,
     tableName: 'movimentacoes_estoque',
     timestamps: true,
     createdAt: 'created_at',
@@ -285,177 +458,6 @@ module.exports = (sequelize) => {
       }
     }
   });
-
-  // Definir associações
-  MovimentacaoEstoque.associate = (models) => {
-    // Pertence a um item de estoque
-    MovimentacaoEstoque.belongsTo(models.ItemEstoque, {
-      foreignKey: 'item_estoque_id',
-      as: 'item_estoque',
-      onDelete: 'RESTRICT'
-    });
-
-    // Pertence a um fornecedor (para entradas)
-    MovimentacaoEstoque.belongsTo(models.Fornecedor, {
-      foreignKey: 'fornecedor_id',
-      as: 'fornecedor',
-      onDelete: 'SET NULL'
-    });
-
-    // Pertence a uma ordem de serviço (para saídas)
-    MovimentacaoEstoque.belongsTo(models.OrdemServico, {
-      foreignKey: 'ordem_servico_id',
-      as: 'ordem_servico',
-      onDelete: 'SET NULL'
-    });
-
-    // Pertence a um plano preventivo (para saídas)
-    MovimentacaoEstoque.belongsTo(models.PlanoPreventivo, {
-      foreignKey: 'plano_preventivo_id',
-      as: 'plano_preventivo',
-      onDelete: 'SET NULL'
-    });
-
-    // Pertence a setores (origem e destino)
-    MovimentacaoEstoque.belongsTo(models.Setor, {
-      foreignKey: 'setor_origem_id',
-      as: 'setor_origem',
-      onDelete: 'SET NULL'
-    });
-
-    MovimentacaoEstoque.belongsTo(models.Setor, {
-      foreignKey: 'setor_destino_id',
-      as: 'setor_destino',
-      onDelete: 'SET NULL'
-    });
-
-    // Pertence a usuários
-    MovimentacaoEstoque.belongsTo(models.User, {
-      foreignKey: 'usuario_id',
-      as: 'usuario',
-      onDelete: 'RESTRICT'
-    });
-
-    MovimentacaoEstoque.belongsTo(models.User, {
-      foreignKey: 'aprovado_por_id',
-      as: 'aprovado_por',
-      onDelete: 'SET NULL'
-    });
-  };
-
-  // Métodos da instância
-  MovimentacaoEstoque.prototype.atualizarEstoqueItem = async function() {
-    const item = await this.getItem_estoque();
-    if (!item) return;
-
-    let novaQuantidade;
-    if (this.operacao === 'soma') {
-      novaQuantidade = parseFloat(item.quantidade_atual) + parseFloat(this.quantidade);
-    } else {
-      novaQuantidade = parseFloat(item.quantidade_atual) - parseFloat(this.quantidade);
-    }
-
-    // Garantir que a quantidade não seja negativa
-    novaQuantidade = Math.max(0, novaQuantidade);
-
-    // Atualizar preço médio se for uma entrada com preço
-    let novoPrecoMedio = item.preco_medio;
-    if (this.tipo_movimentacao === 'entrada' && this.preco_unitario) {
-      const quantidadeAnterior = parseFloat(item.quantidade_atual);
-      const precoAnterior = parseFloat(item.preco_medio || 0);
-      const quantidadeEntrada = parseFloat(this.quantidade);
-      const precoEntrada = parseFloat(this.preco_unitario);
-
-      if (quantidadeAnterior > 0) {
-        // Calcular preço médio ponderado
-        const valorAnterior = quantidadeAnterior * precoAnterior;
-        const valorEntrada = quantidadeEntrada * precoEntrada;
-        const quantidadeTotal = quantidadeAnterior + quantidadeEntrada;
-        novoPrecoMedio = (valorAnterior + valorEntrada) / quantidadeTotal;
-      } else {
-        // Se não havia estoque, usar o preço da entrada
-        novoPrecoMedio = precoEntrada;
-      }
-    }
-
-    // Calcular novo valor total
-    const novoValorTotal = novaQuantidade * parseFloat(novoPrecoMedio || 0);
-
-    await item.update({
-      quantidade_atual: novaQuantidade,
-      preco_medio: novoPrecoMedio,
-      valor_total: novoValorTotal
-    });
-  };
-
-  MovimentacaoEstoque.prototype.isVencida = function() {
-    if (!this.data_validade) return false;
-    return new Date() > new Date(this.data_validade);
-  };
-
-  MovimentacaoEstoque.prototype.diasParaVencimento = function() {
-    if (!this.data_validade) return null;
-    const hoje = new Date();
-    const vencimento = new Date(this.data_validade);
-    const diferenca = vencimento - hoje;
-    return Math.ceil(diferenca / (1000 * 60 * 60 * 24));
-  };
-
-  // Métodos estáticos
-  MovimentacaoEstoque.buscarPorNumero = async function(numero) {
-    return await this.findOne({
-      where: { numero_movimentacao: numero },
-      include: [
-        { model: sequelize.models.ItemEstoque, as: 'item_estoque' },
-        { model: sequelize.models.Fornecedor, as: 'fornecedor' },
-        { model: sequelize.models.User, as: 'usuario', attributes: ['id', 'nome'] },
-        { model: sequelize.models.User, as: 'aprovado_por', attributes: ['id', 'nome'] }
-      ]
-    });
-  };
-
-  MovimentacaoEstoque.relatorioPorPeriodo = async function(dataInicio, dataFim, filtros = {}) {
-    const where = {
-      data_movimentacao: {
-        [Op.between]: [dataInicio, dataFim]
-      },
-      ...filtros
-    };
-
-    return await this.findAll({
-      where,
-      include: [
-        { model: sequelize.models.ItemEstoque, as: 'item_estoque' },
-        { model: sequelize.models.Fornecedor, as: 'fornecedor' },
-        { model: sequelize.models.User, as: 'usuario', attributes: ['id', 'nome'] }
-      ],
-      order: [['data_movimentacao', 'DESC']]
-    });
-  };
-
-  MovimentacaoEstoque.estatisticasPorTipo = async function(dataInicio, dataFim) {
-    const movimentacoes = await this.findAll({
-      where: {
-        data_movimentacao: {
-          [Op.between]: [dataInicio, dataFim]
-        }
-      },
-      attributes: [
-        'tipo_movimentacao',
-        [sequelize.fn('COUNT', sequelize.col('id')), 'total_movimentacoes'],
-        [sequelize.fn('SUM', sequelize.col('quantidade')), 'total_quantidade'],
-        [sequelize.fn('SUM', sequelize.col('valor_total')), 'total_valor']
-      ],
-      group: ['tipo_movimentacao']
-    });
-
-    return movimentacoes.map(mov => ({
-      tipo: mov.tipo_movimentacao,
-      total_movimentacoes: parseInt(mov.dataValues.total_movimentacoes),
-      total_quantidade: parseFloat(mov.dataValues.total_quantidade || 0),
-      total_valor: parseFloat(mov.dataValues.total_valor || 0)
-    }));
-  };
 
   return MovimentacaoEstoque;
 };

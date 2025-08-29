@@ -1,7 +1,193 @@
-const { DataTypes } = require('sequelize');
+const { Model, DataTypes } = require('sequelize');
+
+class PlanoPreventivo extends Model {
+  static associate(models) {
+    // Pertence a um ativo
+    this.belongsTo(models.Ativo, {
+      foreignKey: 'ativo_id',
+      as: 'ativoObj'
+    });
+
+    // Pertence a um setor (opcional)
+    this.belongsTo(models.Setor, {
+      foreignKey: 'setor_id',
+      as: 'setorObj'
+    });
+
+    // Pertence a um responsável (usuário)
+    this.belongsTo(models.User, {
+      foreignKey: 'responsavel_id',
+      as: 'responsavelObj'
+    });
+
+    // Pode ter muitas execuções de manutenção (futura implementação)
+    // this.hasMany(models.ExecucaoPreventiva, {
+    //   foreignKey: 'plano_id',
+    //   as: 'execucoes'
+    // });
+  }
+
+  // Métodos de instância
+  calcularProximaExecucao() {
+    const hoje = new Date();
+    const ultimaExecucao = this.ultima_execucao ? new Date(this.ultima_execucao) : new Date(this.data_inicio);
+    
+    let proximaData = new Date(ultimaExecucao);
+    
+    switch (this.tipo_periodicidade) {
+      case 'diaria':
+        proximaData.setDate(proximaData.getDate() + this.intervalo_periodicidade);
+        break;
+      case 'semanal':
+        proximaData.setDate(proximaData.getDate() + (7 * this.intervalo_periodicidade));
+        break;
+      case 'quinzenal':
+        proximaData.setDate(proximaData.getDate() + (15 * this.intervalo_periodicidade));
+        break;
+      case 'mensal':
+        proximaData.setMonth(proximaData.getMonth() + this.intervalo_periodicidade);
+        break;
+      case 'bimestral':
+        proximaData.setMonth(proximaData.getMonth() + (2 * this.intervalo_periodicidade));
+        break;
+      case 'trimestral':
+        proximaData.setMonth(proximaData.getMonth() + (3 * this.intervalo_periodicidade));
+        break;
+      case 'semestral':
+        proximaData.setMonth(proximaData.getMonth() + (6 * this.intervalo_periodicidade));
+        break;
+      case 'anual':
+        proximaData.setFullYear(proximaData.getFullYear() + this.intervalo_periodicidade);
+        break;
+      case 'horas_funcionamento':
+      case 'contador_producao':
+        // Para estes tipos, a próxima execução é calculada baseada nos valores do ativo
+        return null; // Requer consulta ao ativo
+    }
+    
+    return proximaData.toISOString().split('T')[0]; // Retorna no formato YYYY-MM-DD
+  }
+
+  diasParaVencimento() {
+    const hoje = new Date();
+    const proximaExecucao = new Date(this.proxima_execucao);
+    const diffTime = proximaExecucao - hoje;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  }
+
+  statusVencimento() {
+    const dias = this.diasParaVencimento();
+    
+    if (dias < 0) {
+      return 'vencido';
+    } else if (dias <= this.dias_antecedencia_alerta) {
+      return 'alerta';
+    } else {
+      return 'normal';
+    }
+  }
+
+  async precisaManutencaoByMetrica() {
+    if (!this.ativo) {
+      return false;
+    }
+
+    if (this.tipo_periodicidade === 'horas_funcionamento' && this.horas_funcionamento_limite) {
+      const horasAtual = parseFloat(this.ativo.horas_funcionamento) || 0;
+      const horasUltimaExecucao = parseFloat(this.executado_horas) || 0;
+      return (horasAtual - horasUltimaExecucao) >= this.horas_funcionamento_limite;
+    }
+
+    if (this.tipo_periodicidade === 'contador_producao' && this.contador_producao_limite) {
+      const contadorAtual = parseInt(this.ativo.contador_producao) || 0;
+      const contadorUltimaExecucao = parseInt(this.executado_contador) || 0;
+      return (contadorAtual - contadorUltimaExecucao) >= this.contador_producao_limite;
+    }
+
+    return false;
+  }
+
+  // Métodos estáticos
+  static async obterPlanosPorStatus(status = 'all') {
+    const where = { ativo: true };
+    
+    if (status === 'vencidos') {
+      where.proxima_execucao = {
+        [this.sequelize.Op.lt]: new Date()
+      };
+    } else if (status === 'alerta') {
+      const dataLimite = new Date();
+      dataLimite.setDate(dataLimite.getDate() + 7); // Próximos 7 dias
+      where.proxima_execucao = {
+        [this.sequelize.Op.between]: [new Date(), dataLimite]
+      };
+    }
+
+    return await this.findAll({
+      where,
+      include: [
+        { model: this.sequelize.models.Ativo, as: 'ativo' },
+        { model: this.sequelize.models.Setor, as: 'setor' },
+        { model: this.sequelize.models.User, as: 'responsavel' }
+      ],
+      order: [['proxima_execucao', 'ASC']]
+    });
+  }
+
+  static async estatisticas() {
+    const hoje = new Date();
+    const proximosSete = new Date();
+    proximosSete.setDate(hoje.getDate() + 7);
+
+    const [total, ativos, vencidos, proximoVencimento, porCategoria, porPrioridade] = await Promise.all([
+      this.count(),
+      this.count({ where: { ativo: true } }),
+      this.count({
+        where: {
+          ativo: true,
+          proxima_execucao: { [this.sequelize.Op.lt]: hoje }
+        }
+      }),
+      this.count({
+        where: {
+          ativo: true,
+          proxima_execucao: { [this.sequelize.Op.between]: [hoje, proximosSete] }
+        }
+      }),
+      this.findAll({
+        attributes: [
+          'categoria',
+          [this.sequelize.fn('COUNT', this.sequelize.col('id')), 'total']
+        ],
+        where: { ativo: true },
+        group: ['categoria'],
+        raw: true
+      }),
+      this.findAll({
+        attributes: [
+          'prioridade',
+          [this.sequelize.fn('COUNT', this.sequelize.col('id')), 'total']
+        ],
+        where: { ativo: true },
+        group: ['prioridade'],
+        raw: true
+      })
+    ]);
+
+    return {
+      total,
+      ativos,
+      vencidos,
+      proximoVencimento,
+      porCategoria,
+      porPrioridade
+    };
+  }
+}
 
 module.exports = (sequelize) => {
-  const PlanoPreventivo = sequelize.define('PlanoPreventivo', {
+  PlanoPreventivo.init({
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -272,6 +458,7 @@ module.exports = (sequelize) => {
       allowNull: true
     }
   }, {
+    sequelize,
     tableName: 'planos_preventivos',
     timestamps: true,
     createdAt: 'created_at',
@@ -298,191 +485,6 @@ module.exports = (sequelize) => {
       }
     }
   });
-
-  // Associações
-  PlanoPreventivo.associate = function(models) {
-    // Pertence a um ativo
-    PlanoPreventivo.belongsTo(models.Ativo, {
-      foreignKey: 'ativo_id',
-      as: 'ativoObj'
-    });
-
-    // Pertence a um setor (opcional)
-    PlanoPreventivo.belongsTo(models.Setor, {
-      foreignKey: 'setor_id',
-      as: 'setorObj'
-    });
-
-    // Pertence a um responsável (usuário)
-    PlanoPreventivo.belongsTo(models.User, {
-      foreignKey: 'responsavel_id',
-      as: 'responsavelObj'
-    });
-
-    // Pode ter muitas execuções de manutenção (futura implementação)
-    // PlanoPreventivo.hasMany(models.ExecucaoPreventiva, {
-    //   foreignKey: 'plano_id',
-    //   as: 'execucoes'
-    // });
-  };
-
-  // Métodos de instância
-  PlanoPreventivo.prototype.calcularProximaExecucao = function() {
-    const hoje = new Date();
-    const ultimaExecucao = this.ultima_execucao ? new Date(this.ultima_execucao) : new Date(this.data_inicio);
-    
-    let proximaData = new Date(ultimaExecucao);
-    
-    switch (this.tipo_periodicidade) {
-      case 'diaria':
-        proximaData.setDate(proximaData.getDate() + this.intervalo_periodicidade);
-        break;
-      case 'semanal':
-        proximaData.setDate(proximaData.getDate() + (7 * this.intervalo_periodicidade));
-        break;
-      case 'quinzenal':
-        proximaData.setDate(proximaData.getDate() + (15 * this.intervalo_periodicidade));
-        break;
-      case 'mensal':
-        proximaData.setMonth(proximaData.getMonth() + this.intervalo_periodicidade);
-        break;
-      case 'bimestral':
-        proximaData.setMonth(proximaData.getMonth() + (2 * this.intervalo_periodicidade));
-        break;
-      case 'trimestral':
-        proximaData.setMonth(proximaData.getMonth() + (3 * this.intervalo_periodicidade));
-        break;
-      case 'semestral':
-        proximaData.setMonth(proximaData.getMonth() + (6 * this.intervalo_periodicidade));
-        break;
-      case 'anual':
-        proximaData.setFullYear(proximaData.getFullYear() + this.intervalo_periodicidade);
-        break;
-      case 'horas_funcionamento':
-      case 'contador_producao':
-        // Para estes tipos, a próxima execução é calculada baseada nos valores do ativo
-        return null; // Requer consulta ao ativo
-    }
-    
-    return proximaData.toISOString().split('T')[0]; // Retorna no formato YYYY-MM-DD
-  };
-
-  PlanoPreventivo.prototype.diasParaVencimento = function() {
-    const hoje = new Date();
-    const proximaExecucao = new Date(this.proxima_execucao);
-    const diffTime = proximaExecucao - hoje;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays;
-  };
-
-  PlanoPreventivo.prototype.statusVencimento = function() {
-    const dias = this.diasParaVencimento();
-    
-    if (dias < 0) {
-      return 'vencido';
-    } else if (dias <= this.dias_antecedencia_alerta) {
-      return 'alerta';
-    } else {
-      return 'normal';
-    }
-  };
-
-  PlanoPreventivo.prototype.precisaManutencaoByMetrica = async function() {
-    if (!this.ativo) {
-      return false;
-    }
-
-    if (this.tipo_periodicidade === 'horas_funcionamento' && this.horas_funcionamento_limite) {
-      const horasAtual = parseFloat(this.ativo.horas_funcionamento) || 0;
-      const horasUltimaExecucao = parseFloat(this.executado_horas) || 0;
-      return (horasAtual - horasUltimaExecucao) >= this.horas_funcionamento_limite;
-    }
-
-    if (this.tipo_periodicidade === 'contador_producao' && this.contador_producao_limite) {
-      const contadorAtual = parseInt(this.ativo.contador_producao) || 0;
-      const contadorUltimaExecucao = parseInt(this.executado_contador) || 0;
-      return (contadorAtual - contadorUltimaExecucao) >= this.contador_producao_limite;
-    }
-
-    return false;
-  };
-
-  // Métodos estáticos
-  PlanoPreventivo.obterPlanosPorStatus = async function(status = 'all') {
-    const where = { ativo: true };
-    
-    if (status === 'vencidos') {
-      where.proxima_execucao = {
-        [sequelize.Sequelize.Op.lt]: new Date()
-      };
-    } else if (status === 'alerta') {
-      const dataLimite = new Date();
-      dataLimite.setDate(dataLimite.getDate() + 7); // Próximos 7 dias
-      where.proxima_execucao = {
-        [sequelize.Sequelize.Op.between]: [new Date(), dataLimite]
-      };
-    }
-
-    return await PlanoPreventivo.findAll({
-      where,
-      include: [
-        { model: sequelize.models.Ativo, as: 'ativo' },
-        { model: sequelize.models.Setor, as: 'setor' },
-        { model: sequelize.models.User, as: 'responsavel' }
-      ],
-      order: [['proxima_execucao', 'ASC']]
-    });
-  };
-
-  PlanoPreventivo.estatisticas = async function() {
-    const hoje = new Date();
-    const proximosSete = new Date();
-    proximosSete.setDate(hoje.getDate() + 7);
-
-    const [total, ativos, vencidos, proximoVencimento, porCategoria, porPrioridade] = await Promise.all([
-      PlanoPreventivo.count(),
-      PlanoPreventivo.count({ where: { ativo: true } }),
-      PlanoPreventivo.count({
-        where: {
-          ativo: true,
-          proxima_execucao: { [sequelize.Sequelize.Op.lt]: hoje }
-        }
-      }),
-      PlanoPreventivo.count({
-        where: {
-          ativo: true,
-          proxima_execucao: { [sequelize.Sequelize.Op.between]: [hoje, proximosSete] }
-        }
-      }),
-      PlanoPreventivo.findAll({
-        attributes: [
-          'categoria',
-          [sequelize.Sequelize.fn('COUNT', sequelize.Sequelize.col('id')), 'total']
-        ],
-        where: { ativo: true },
-        group: ['categoria'],
-        raw: true
-      }),
-      PlanoPreventivo.findAll({
-        attributes: [
-          'prioridade',
-          [sequelize.Sequelize.fn('COUNT', sequelize.Sequelize.col('id')), 'total']
-        ],
-        where: { ativo: true },
-        group: ['prioridade'],
-        raw: true
-      })
-    ]);
-
-    return {
-      total,
-      ativos,
-      vencidos,
-      proximoVencimento,
-      porCategoria,
-      porPrioridade
-    };
-  };
 
   return PlanoPreventivo;
 };

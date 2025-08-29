@@ -45,3 +45,4 @@ class FmeaService {
 }
 
 export default new FmeaService();
+

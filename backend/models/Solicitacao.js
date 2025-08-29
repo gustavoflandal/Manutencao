@@ -1,7 +1,51 @@
-const { DataTypes } = require('sequelize');
+const { Model, DataTypes } = require('sequelize');
+
+class Solicitacao extends Model {
+  static associate(models) {
+    this.belongsTo(models.User, {
+      foreignKey: 'solicitante_id',
+      as: 'solicitante'
+    });
+
+    this.belongsTo(models.User, {
+      foreignKey: 'responsavel_id',
+      as: 'responsavel'
+    });
+
+    this.belongsTo(models.Department, {
+      foreignKey: 'department_id',
+      as: 'department'
+    });
+
+    this.belongsTo(models.Category, {
+      foreignKey: 'category_id',
+      as: 'category'
+    });
+
+    this.belongsTo(models.SubCategory, {
+      foreignKey: 'subcategory_id',
+      as: 'subcategory'
+    });
+
+    this.belongsTo(models.Ativo, {
+      foreignKey: 'ativo_id',
+      as: 'ativo'
+    });
+
+    this.belongsTo(models.Setor, {
+      foreignKey: 'setor_id',
+      as: 'setor'
+    });
+
+    this.hasMany(models.OrdemServico, {
+      foreignKey: 'solicitacao_id',
+      as: 'ordens_servico'
+    });
+  }
+}
 
 module.exports = (sequelize) => {
-  const Solicitacao = sequelize.define('Solicitacao', {
+  Solicitacao.init({
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -105,6 +149,7 @@ module.exports = (sequelize) => {
       }
     }
   }, {
+    sequelize,
     tableName: 'solicitacoes',
     timestamps: true,
     createdAt: 'created_at',
@@ -147,52 +192,6 @@ module.exports = (sequelize) => {
       }
     }
   });
-
-  // Definir associações
-  Solicitacao.associate = (models) => {
-    Solicitacao.belongsTo(models.User, {
-      foreignKey: 'solicitante_id',
-      as: 'solicitante'
-    });
-
-    Solicitacao.belongsTo(models.User, {
-      foreignKey: 'responsavel_id',
-      as: 'responsavel'
-    });
-
-    Solicitacao.belongsTo(models.Department, {
-      foreignKey: 'department_id',
-      as: 'department'
-    });
-
-    Solicitacao.belongsTo(models.Category, {
-      foreignKey: 'category_id',
-      as: 'category'
-    });
-
-    Solicitacao.belongsTo(models.SubCategory, {
-      foreignKey: 'subcategory_id',
-      as: 'subcategory'
-    });
-
-    // Relação com Ativo
-    Solicitacao.belongsTo(models.Ativo, {
-      foreignKey: 'ativo_id',
-      as: 'ativo'
-    });
-
-    // Relação com Setor
-    Solicitacao.belongsTo(models.Setor, {
-      foreignKey: 'setor_id',
-      as: 'setor'
-    });
-
-    // Relação com Ordem de Serviço
-    Solicitacao.hasMany(models.OrdemServico, {
-      foreignKey: 'solicitacao_id',
-      as: 'ordens_servico'
-    });
-  };
 
   return Solicitacao;
 };

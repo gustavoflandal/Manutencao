@@ -1,49 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const { authenticate, checkPermission, requireRole } = require('../middleware/permissions');
 const FmeaController = require('../controllers/FmeaController');
+const validateRequest = require('../middleware/validateRequest');
+const { authenticate, checkPermission } = require('../middleware/permissions');
 
-// Todas as rotas requerem autenticação
+// Aplicar autenticação em todas as rotas
 router.use(authenticate);
-const { checkPermission } = require('../middleware/permissions');
-  FmeaController.index
-);
 
-// Criar nova análise FMEA
-router.post('/',
-  checkPermission('create_fmea'),
-  FmeaController.create
-);
+router.get('/', checkPermission('view_fmea'), FmeaController.index);
+router.post('/', checkPermission('create_fmea'), validateRequest('createFmea'), FmeaController.create);
+router.get('/:id', checkPermission('view_fmea'), FmeaController.show);
+router.put('/:id', checkPermission('edit_fmea'), validateRequest('updateFmea'), FmeaController.update);
+router.delete('/:id', checkPermission('delete_fmea'), FmeaController.destroy);
 
-// Obter detalhes de uma análise FMEA
-router.get('/:id',
-  checkPermission('view_fmea'),
-  FmeaController.get
-);
-
-// Atualizar análise FMEA
-router.put('/:id',
-  checkPermission('edit_fmea'),
-  FmeaController.update
-);
-
-// Adicionar ação a uma análise FMEA
-router.post('/:id/actions',
-  checkPermission('edit_fmea'),
-  FmeaController.addAction
-);
-
-// Obter análises críticas
-router.get('/reports/critical',
-  checkPermission('view_fmea_reports'),
-  FmeaController.getCriticalAnalyses
-);
-
-// Obter estatísticas
-router.get('/reports/statistics',
-  checkPermission('view_fmea_reports'),
-  FmeaController.getStatistics
-);
-
-// Arquivo legado: rotas FMEA foram migradas para fmea-routes.js
-module.exports = require('./fmea-routes');
+module.exports = router;

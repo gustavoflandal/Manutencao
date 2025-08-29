@@ -3,79 +3,57 @@ const router = express.Router();
 
 // Importar rotas
 const authRoutes = require('./auth');
-const userRoutes = require('./users');
-const permissionRoutes = require('./permissions');
-const fmeaRoutes = require('./fmea-routes');
-const departmentRoutes = require('./departments');
-const solicitacaoRoutes = require('./solicitacoes');
-const categoryRoutes = require('./categories');
-const subcategoryRoutes = require('./subcategories');
-const ordemServicoRoutes = require('./ordens-servico');
-const ativoRoutes = require('./ativos');
-const setorRoutes = require('./setores');
+const fmeaRoutes = require('./fmea');
+const ordensRoutes = require('./ordens-servico');
+const usersRoutes = require('./users');
+const ativosRoutes = require('./ativos');
+const solicitacoesRoutes = require('./solicitacoes');
+const setoresRoutes = require('./setores');
+const categoriesRoutes = require('./categories');
+const subcategoriesRoutes = require('./subcategories');
+const departmentsRoutes = require('./departments');
+const permissionsRoutes = require('./permissions');
 const estoqueRoutes = require('./estoque');
-const preventivaRoutes = require('./preventiva');
 const agendamentoRoutes = require('./agendamento');
-const relatorioRoutes = require('./relatorios');
+const preventivaRoutes = require('./preventiva');
+const relatoriosRoutes = require('./relatorios');
 const reportsRoutes = require('./reports');
 const uploadRoutes = require('./upload');
-const notificacaoRoutes = require('./notificacoes');
-const analyticsRoutes = require('./analytics');
-const workflowRoutes = require('./workflows');
+const workflowsRoutes = require('./workflows');
 const auditoriaRoutes = require('./auditoria');
+const notificacoesRoutes = require('./notificacoes');
+const analyticsRoutes = require('./analytics');
+const publicRoutes = require('./public');
 
-// Registrar rotas
+// Configurar rotas públicas (sem autenticação)
+router.use('/public', publicRoutes);
+
+// Configurar rotas autenticadas
 router.use('/auth', authRoutes);
-router.use('/users', userRoutes);
-router.use('/permissions', permissionRoutes);
 router.use('/fmea', fmeaRoutes);
-router.use('/departments', departmentRoutes);
-router.use('/solicitacoes', solicitacaoRoutes);
-router.use('/categories', categoryRoutes);
-router.use('/subcategories', subcategoryRoutes);
-router.use('/ordens-servico', ordemServicoRoutes);
-router.use('/ativos', ativoRoutes);
-router.use('/setores', setorRoutes);
+router.use('/ordens-servico', ordensRoutes);
+router.use('/users', usersRoutes);
+router.use('/ativos', ativosRoutes);
+router.use('/solicitacoes', solicitacoesRoutes);
+router.use('/setores', setoresRoutes);
+router.use('/categories', categoriesRoutes);
+router.use('/subcategories', subcategoriesRoutes);
+router.use('/departments', departmentsRoutes);
+router.use('/permissions', permissionsRoutes);
 router.use('/estoque', estoqueRoutes);
-router.use('/preventiva', preventivaRoutes);
 router.use('/agendamento', agendamentoRoutes);
-router.use('/relatorios', relatorioRoutes);
+router.use('/preventiva', preventivaRoutes);
+router.use('/relatorios', relatoriosRoutes);
 router.use('/reports', reportsRoutes);
 router.use('/upload', uploadRoutes);
-router.use('/notificacoes', notificacaoRoutes);
-router.use('/analytics', analyticsRoutes);
-router.use('/workflows', workflowRoutes);
+router.use('/workflows', workflowsRoutes);
 router.use('/auditoria', auditoriaRoutes);
+router.use('/notificacoes', notificacoesRoutes);
+router.use('/analytics', analyticsRoutes);
 
 // Rota de health check
 router.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime()
-  });
-});
-
-// Rota pública para departamentos ativos (para formulários)
-router.get('/public/departments/active', async (req, res) => {
-  try {
-    const { Department } = require('../models');
-    const departments = await Department.findAll({
-      where: { ativo: true },
-      attributes: ['id', 'nome'],
-      order: [['nome', 'ASC']]
-    });
-    
-    res.json({
-      success: true,
-      data: { departments }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Erro interno do servidor'
-    });
-  }
+  res.json({ status: 'ok' });
 });
 
 module.exports = router;

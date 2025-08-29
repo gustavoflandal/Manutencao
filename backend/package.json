@@ -9,32 +9,35 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:auth": "node scripts/test-auth-system.js",
+    "test:permissions": "node scripts/test-permissions.js",
     "migrate": "sequelize-cli db:migrate",
-    "seed": "sequelize-cli db:seed:all",
-    "test:connection": "node scripts/test-connection.js",
-    "setup": "npm install && npm run migrate && npm run seed"
+    "seed": "sequelize-cli db:seed:all"
   },
   "dependencies": {
+    "axios": "^1.11.0",
     "bcryptjs": "^2.4.3",
-    "compression": "^1.7.4",
+    "chart.js": "^4.5.0",
+    "colors": "^1.4.0",
+    "compression": "^1.8.1",
     "cors": "^2.8.5",
-    "dotenv": "^16.6.1",
+    "dotenv": "^16.3.1",
     "exceljs": "^4.4.0",
-    "express": "^4.21.2",
-    "express-rate-limit": "^6.8.1",
-    "helmet": "^7.0.0",
+    "express": "^4.18.2",
+    "express-rate-limit": "^6.11.2",
+    "helmet": "^7.2.0",
+    "joi": "^18.0.1",
     "jsonwebtoken": "^9.0.2",
-    "level": "^10.0.0",
-    "multer": "^1.4.5-lts.1",
-    "mysql2": "^3.14.3",
+    "multer": "^2.0.2",
+    "mysql2": "^3.6.0",
     "pdfkit": "^0.17.1",
-    "sequelize": "^6.37.7",
+    "sequelize": "^6.32.1",
     "winston": "^3.10.0"
   },
   "devDependencies": {
     "jest": "^29.7.0",
     "nodemon": "^3.0.1",
-    "sequelize-cli": "^6.6.3",
+    "sequelize-cli": "^6.6.1",
     "supertest": "^6.3.4"
   }
 }

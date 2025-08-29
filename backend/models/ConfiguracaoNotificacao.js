@@ -1,7 +1,171 @@
-const { DataTypes } = require('sequelize');
+const { Model, DataTypes } = require('sequelize');
+
+class ConfiguracaoNotificacao extends Model {
+  static associate(models) {
+    // Pertence a um usuário
+    this.belongsTo(models.User, {
+      foreignKey: 'user_id',
+      as: 'user'
+    });
+  }
+
+  // Métodos de instância
+  deveReceberNotificacao(tipoNotificacao, prioridade) {
+    // Verificar se notificações estão pausadas
+    if (this.pausar_notificacoes) {
+      if (this.pausar_ate && new Date() < new Date(this.pausar_ate)) {
+        return false;
+      } else if (this.pausar_ate && new Date() >= new Date(this.pausar_ate)) {
+        // Despausar automaticamente
+        this.pausar_notificacoes = false;
+        this.pausar_ate = null;
+        this.save();
+      }
+    }
+
+    // Verificar prioridade mínima
+    const prioridades = { 'baixa': 1, 'normal': 2, 'alta': 3, 'critica': 4 };
+    if (prioridades[prioridade] < prioridades[this.prioridade_minima_notificacao]) {
+      return false;
+    }
+
+    // Verificar configuração específica do tipo
+    const configTipo = {
+      'sistema': this.notificacoes_sistema,
+      'ordem_criada': this.notificacoes_ordens,
+      'ordem_atualizada': this.notificacoes_ordens,
+      'manutencao_vencida': this.notificacoes_manutencao,
+      'ativo_problema': this.notificacoes_ativos,
+      'estoque_baixo': this.notificacoes_estoque
+    };
+
+    return configTipo[tipoNotificacao] !== false;
+  }
+
+  deveReceberEmail(tipoNotificacao, prioridade) {
+    // Verificar se emails estão pausados
+    if (this.pausar_notificacoes) {
+      return false;
+    }
+
+    // Verificar prioridade mínima para email
+    const prioridades = { 'baixa': 1, 'normal': 2, 'alta': 3, 'critica': 4 };
+    if (prioridades[prioridade] < prioridades[this.prioridade_minima_email]) {
+      return false;
+    }
+
+    // Verificar configuração específica do tipo para email
+    const configEmail = {
+      'sistema': this.email_sistema,
+      'ordem_criada': this.email_ordens,
+      'ordem_atualizada': this.email_ordens,
+      'manutencao_vencida': this.email_manutencao,
+      'ativo_problema': this.email_ativos,
+      'estoque_baixo': this.email_estoque
+    };
+
+    return configEmail[tipoNotificacao] === true;
+  }
+
+  estaNoHorarioPermitido() {
+    if (!this.horario_inicio_notificacoes || !this.horario_fim_notificacoes) {
+      return true; // Sem restrição de horário
+    }
+
+    const agora = new Date();
+    const horaAtual = agora.getHours() * 100 + agora.getMinutes();
+    
+    const inicio = parseInt(this.horario_inicio_notificacoes.replace(':', ''));
+    const fim = parseInt(this.horario_fim_notificacoes.replace(':', ''));
+
+    if (inicio <= fim) {
+      return horaAtual >= inicio && horaAtual <= fim;
+    } else {
+      // Horário que cruza meia-noite
+      return horaAtual >= inicio || horaAtual <= fim;
+    }
+  }
+
+  // Métodos estáticos
+  static async obterPorUsuario(userId) {
+    let config = await this.findOne({
+      where: { user_id: userId }
+    });
+
+    // Se não existe, criar com padrões
+    if (!config) {
+      config = await this.create({ user_id: userId });
+    }
+
+    return config;
+  }
+
+  static async atualizarPorUsuario(userId, novasConfiguracoes) {
+    let config = await this.findOne({
+      where: { user_id: userId }
+    });
+
+    if (!config) {
+      config = await this.create({
+        user_id: userId,
+        ...novasConfiguracoes
+      });
+    } else {
+      await config.update(novasConfiguracoes);
+    }
+
+    return config;
+  }
+
+  static async obterUsuariosParaNotificacao(tipoNotificacao, prioridade, setorId = null) {
+    const configs = await this.findAll({
+      include: [
+        {
+          model: this.sequelize.models.User,
+          as: 'user',
+          where: { ativo: true },
+          attributes: ['id', 'nome', 'email', 'perfil']
+        }
+      ]
+    });
+
+    const usuariosValidos = [];
+
+    for (const config of configs) {
+      // Verificar se deve receber notificação
+      if (!config.deveReceberNotificacao(tipoNotificacao, prioridade)) {
+        continue;
+      }
+
+      // Verificar horário permitido
+      if (!config.estaNoHorarioPermitido()) {
+        continue;
+      }
+
+      // Verificar interesse por setor
+      if (setorId && config.setores_interesse) {
+        const setoresInteresse = Array.isArray(config.setores_interesse) 
+          ? config.setores_interesse 
+          : JSON.parse(config.setores_interesse);
+        
+        if (!setoresInteresse.includes(setorId)) {
+          continue;
+        }
+      }
+
+      usuariosValidos.push({
+        user: config.user,
+        config: config,
+        deve_receber_email: config.deveReceberEmail(tipoNotificacao, prioridade)
+      });
+    }
+
+    return usuariosValidos;
+  }
+}
 
 module.exports = (sequelize) => {
-  const ConfiguracaoNotificacao = sequelize.define('ConfiguracaoNotificacao', {
+  ConfiguracaoNotificacao.init({
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -144,6 +308,7 @@ module.exports = (sequelize) => {
       comment: 'Array de tipos de ativo de interesse para notificações'
     }
   }, {
+    sequelize,
     tableName: 'configuracoes_notificacao',
     timestamps: true,
     createdAt: 'created_at',
@@ -194,169 +359,6 @@ module.exports = (sequelize) => {
       }
     }
   });
-
-  // Associações
-  ConfiguracaoNotificacao.associate = function(models) {
-    // Pertence a um usuário
-    ConfiguracaoNotificacao.belongsTo(models.User, {
-      foreignKey: 'user_id',
-      as: 'user'
-    });
-  };
-
-  // Métodos de instância
-  ConfiguracaoNotificacao.prototype.deveReceberNotificacao = function(tipoNotificacao, prioridade) {
-    // Verificar se notificações estão pausadas
-    if (this.pausar_notificacoes) {
-      if (this.pausar_ate && new Date() < new Date(this.pausar_ate)) {
-        return false;
-      } else if (this.pausar_ate && new Date() >= new Date(this.pausar_ate)) {
-        // Despausar automaticamente
-        this.pausar_notificacoes = false;
-        this.pausar_ate = null;
-        this.save();
-      }
-    }
-
-    // Verificar prioridade mínima
-    const prioridades = { 'baixa': 1, 'normal': 2, 'alta': 3, 'critica': 4 };
-    if (prioridades[prioridade] < prioridades[this.prioridade_minima_notificacao]) {
-      return false;
-    }
-
-    // Verificar configuração específica do tipo
-    const configTipo = {
-      'sistema': this.notificacoes_sistema,
-      'ordem_criada': this.notificacoes_ordens,
-      'ordem_atualizada': this.notificacoes_ordens,
-      'manutencao_vencida': this.notificacoes_manutencao,
-      'ativo_problema': this.notificacoes_ativos,
-      'estoque_baixo': this.notificacoes_estoque
-    };
-
-    return configTipo[tipoNotificacao] !== false;
-  };
-
-  ConfiguracaoNotificacao.prototype.deveReceberEmail = function(tipoNotificacao, prioridade) {
-    // Verificar se emails estão pausados
-    if (this.pausar_notificacoes) {
-      return false;
-    }
-
-    // Verificar prioridade mínima para email
-    const prioridades = { 'baixa': 1, 'normal': 2, 'alta': 3, 'critica': 4 };
-    if (prioridades[prioridade] < prioridades[this.prioridade_minima_email]) {
-      return false;
-    }
-
-    // Verificar configuração específica do tipo para email
-    const configEmail = {
-      'sistema': this.email_sistema,
-      'ordem_criada': this.email_ordens,
-      'ordem_atualizada': this.email_ordens,
-      'manutencao_vencida': this.email_manutencao,
-      'ativo_problema': this.email_ativos,
-      'estoque_baixo': this.email_estoque
-    };
-
-    return configEmail[tipoNotificacao] === true;
-  };
-
-  ConfiguracaoNotificacao.prototype.estaNoHorarioPermitido = function() {
-    if (!this.horario_inicio_notificacoes || !this.horario_fim_notificacoes) {
-      return true; // Sem restrição de horário
-    }
-
-    const agora = new Date();
-    const horaAtual = agora.getHours() * 100 + agora.getMinutes();
-    
-    const inicio = parseInt(this.horario_inicio_notificacoes.replace(':', ''));
-    const fim = parseInt(this.horario_fim_notificacoes.replace(':', ''));
-
-    if (inicio <= fim) {
-      return horaAtual >= inicio && horaAtual <= fim;
-    } else {
-      // Horário que cruza meia-noite
-      return horaAtual >= inicio || horaAtual <= fim;
-    }
-  };
-
-  // Métodos estáticos
-  ConfiguracaoNotificacao.obterPorUsuario = async function(userId) {
-    let config = await ConfiguracaoNotificacao.findOne({
-      where: { user_id: userId }
-    });
-
-    // Se não existe, criar com padrões
-    if (!config) {
-      config = await ConfiguracaoNotificacao.create({ user_id: userId });
-    }
-
-    return config;
-  };
-
-  ConfiguracaoNotificacao.atualizarPorUsuario = async function(userId, novasConfiguracoes) {
-    let config = await ConfiguracaoNotificacao.findOne({
-      where: { user_id: userId }
-    });
-
-    if (!config) {
-      config = await ConfiguracaoNotificacao.create({
-        user_id: userId,
-        ...novasConfiguracoes
-      });
-    } else {
-      await config.update(novasConfiguracoes);
-    }
-
-    return config;
-  };
-
-  ConfiguracaoNotificacao.obterUsuariosParaNotificacao = async function(tipoNotificacao, prioridade, setorId = null) {
-    const configs = await ConfiguracaoNotificacao.findAll({
-      include: [
-        {
-          model: sequelize.models.User,
-          as: 'user',
-          where: { ativo: true },
-          attributes: ['id', 'nome', 'email', 'perfil']
-        }
-      ]
-    });
-
-    const usuariosValidos = [];
-
-    for (const config of configs) {
-      // Verificar se deve receber notificação
-      if (!config.deveReceberNotificacao(tipoNotificacao, prioridade)) {
-        continue;
-      }
-
-      // Verificar horário permitido
-      if (!config.estaNoHorarioPermitido()) {
-        continue;
-      }
-
-      // Verificar interesse por setor
-      if (setorId && config.setores_interesse) {
-        const setoresInteresse = Array.isArray(config.setores_interesse) 
-          ? config.setores_interesse 
-          : JSON.parse(config.setores_interesse);
-        
-        if (!setoresInteresse.includes(setorId)) {
-          continue;
-        }
-      }
-
-      usuariosValidos.push({
-        user: config.user,
-        config: config,
-        deve_receber_email: config.deveReceberEmail(tipoNotificacao, prioridade)
-      });
-    }
-
-    return usuariosValidos;
-  };
 
   return ConfiguracaoNotificacao;
 };

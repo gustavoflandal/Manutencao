@@ -1,7 +1,16 @@
-const { DataTypes } = require('sequelize');
+const { Model, DataTypes } = require('sequelize');
+
+class AtivoImagem extends Model {
+  static associate(models) {
+    this.belongsTo(models.Ativo, {
+      foreignKey: 'ativo_id',
+      as: 'ativo'
+    });
+  }
+}
 
 module.exports = (sequelize) => {
-  const AtivoImagem = sequelize.define('AtivoImagem', {
+  AtivoImagem.init({
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -45,17 +54,10 @@ module.exports = (sequelize) => {
       }
     }
   }, {
+    sequelize,
     tableName: 'ativo_imagens',
     timestamps: true
   });
-
-  // Associação com Ativo
-  AtivoImagem.associate = (models) => {
-    AtivoImagem.belongsTo(models.Ativo, {
-      foreignKey: 'ativo_id',
-      as: 'ativo'
-    });
-  };
 
   return AtivoImagem;
 };

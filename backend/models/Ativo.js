@@ -1,7 +1,52 @@
-const { DataTypes } = require('sequelize');
+const { Model, DataTypes } = require('sequelize');
+
+class Ativo extends Model {
+  static associate(models) {
+    // Associação com Category
+    this.belongsTo(models.Category, {
+      foreignKey: 'categoria_id',
+      as: 'categoria'
+    });
+
+    // Associação com SubCategory
+    this.belongsTo(models.SubCategory, {
+      foreignKey: 'subcategoria_id',
+      as: 'subcategoria'
+    });
+
+    // Associação com Department
+    this.belongsTo(models.Department, {
+      foreignKey: 'department_id',
+      as: 'department'
+    });
+
+    // Associação com User (responsável)
+    this.belongsTo(models.User, {
+      foreignKey: 'responsavel_id',
+      as: 'responsavel'
+    });
+
+    // Associação com Setor
+    this.belongsTo(models.Setor, {
+      foreignKey: 'setor_id',
+      as: 'setor'
+    });
+
+    // Associações de um para muitos
+    this.hasMany(models.OrdemServico, {
+      foreignKey: 'ativo_id',
+      as: 'ordens_servico'
+    });
+
+    this.hasMany(models.FmeaAnalysis, {
+      foreignKey: 'equipment_id',
+      as: 'fmea_analyses'
+    });
+  }
+}
 
 module.exports = (sequelize) => {
-  const Ativo = sequelize.define('Ativo', {
+  Ativo.init({
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -9,84 +54,44 @@ module.exports = (sequelize) => {
     },
     codigo_patrimonio: {
       type: DataTypes.STRING(50),
-      unique: true,
       allowNull: false,
-      validate: {
-        notEmpty: {
-          msg: 'Código patrimonial é obrigatório'
-        },
-        len: {
-          args: [1, 50],
-          msg: 'Código patrimonial deve ter entre 1 e 50 caracteres'
-        }
-      }
+      unique: true
     },
     nome: {
-      type: DataTypes.STRING(200),
-      allowNull: false,
-      validate: {
-        notEmpty: {
-          msg: 'Nome do ativo é obrigatório'
-        },
-        len: {
-          args: [1, 200],
-          msg: 'Nome deve ter entre 1 e 200 caracteres'
-        }
-      }
+      type: DataTypes.STRING(100),
+      allowNull: false
     },
     fabricante: {
-      type: DataTypes.STRING(100)
+      type: DataTypes.STRING(100),
+      allowNull: false
     },
     modelo: {
-      type: DataTypes.STRING(100)
+      type: DataTypes.STRING(100),
+      allowNull: false
     },
     numero_serie: {
-      type: DataTypes.STRING(100)
+      type: DataTypes.STRING(50),
+      allowNull: false
     },
     ano_fabricacao: {
       type: DataTypes.INTEGER,
-      validate: {
-        min: {
-          args: 1900,
-          msg: 'Ano de fabricação deve ser maior que 1900'
-        },
-        max: {
-          args: new Date().getFullYear() + 1,
-          msg: 'Ano de fabricação não pode ser futuro'
-        }
-      }
+      allowNull: true
     },
     data_aquisicao: {
-      type: DataTypes.DATE
+      type: DataTypes.DATE,
+      allowNull: false
     },
     valor_aquisicao: {
-      type: DataTypes.DECIMAL(15, 2),
-      defaultValue: 0.00,
-      validate: {
-        isDecimal: {
-          msg: 'Valor de aquisição deve ser um número decimal válido'
-        },
-        min: {
-          args: [0],
-          msg: 'Valor de aquisição não pode ser negativo'
-        }
-      }
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true
     },
     valor_atual: {
-      type: DataTypes.DECIMAL(15, 2),
-      defaultValue: 0.00,
-      validate: {
-        isDecimal: {
-          msg: 'Valor atual deve ser um número decimal válido'
-        },
-        min: {
-          args: [0],
-          msg: 'Valor atual não pode ser negativo'
-        }
-      }
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true
     },
     categoria_id: {
       type: DataTypes.INTEGER,
+      allowNull: true,
       references: {
         model: 'categories',
         key: 'id'
@@ -94,6 +99,7 @@ module.exports = (sequelize) => {
     },
     subcategoria_id: {
       type: DataTypes.INTEGER,
+      allowNull: true,
       references: {
         model: 'subcategories',
         key: 'id'
@@ -101,96 +107,99 @@ module.exports = (sequelize) => {
     },
     department_id: {
       type: DataTypes.INTEGER,
+      allowNull: true,
       references: {
         model: 'departments',
         key: 'id'
       }
     },
     localizacao_completa: {
-      type: DataTypes.STRING(500)
+      type: DataTypes.STRING(255),
+      allowNull: true
     },
     predio: {
-      type: DataTypes.STRING(100)
+      type: DataTypes.STRING(50),
+      allowNull: true
     },
     andar: {
-      type: DataTypes.STRING(50)
+      type: DataTypes.STRING(20),
+      allowNull: true
     },
     sala: {
-      type: DataTypes.STRING(100)
+      type: DataTypes.STRING(50),
+      allowNull: true
     },
     posicao: {
-      type: DataTypes.STRING(100)
+      type: DataTypes.STRING(100),
+      allowNull: true
     },
     estado: {
-      type: DataTypes.ENUM('operacional', 'manutencao', 'parado', 'inativo', 'baixado'),
-      defaultValue: 'operacional',
-      validate: {
-        isIn: {
-          args: [['operacional', 'manutencao', 'parado', 'inativo', 'baixado']],
-          msg: 'Estado deve ser: operacional, manutencao, parado, inativo ou baixado'
-        }
-      }
+      type: DataTypes.ENUM('operacional', 'manutencao', 'parado', 'inativo'),
+      defaultValue: 'operacional'
     },
     criticidade: {
       type: DataTypes.ENUM('baixa', 'media', 'alta', 'critica'),
-      defaultValue: 'media',
-      validate: {
-        isIn: {
-          args: [['baixa', 'media', 'alta', 'critica']],
-          msg: 'Criticidade deve ser: baixa, media, alta ou critica'
-        }
-      }
+      defaultValue: 'media'
     },
     potencia: {
-      type: DataTypes.STRING(50)
+      type: DataTypes.STRING(50),
+      allowNull: true
     },
     tensao: {
-      type: DataTypes.STRING(50)
+      type: DataTypes.STRING(20),
+      allowNull: true
     },
     frequencia: {
-      type: DataTypes.STRING(50)
+      type: DataTypes.STRING(20),
+      allowNull: true
     },
     peso: {
       type: DataTypes.DECIMAL(10, 2),
-      validate: {
-        min: {
-          args: [0],
-          msg: 'Peso não pode ser negativo'
-        }
-      }
+      allowNull: true
     },
     dimensoes: {
-      type: DataTypes.STRING(200)
+      type: DataTypes.STRING(100),
+      allowNull: true
     },
     capacidade: {
-      type: DataTypes.STRING(100)
+      type: DataTypes.STRING(50),
+      allowNull: true
     },
     fornecedor: {
-      type: DataTypes.STRING(200)
+      type: DataTypes.STRING(100),
+      allowNull: true
     },
     garantia_ate: {
-      type: DataTypes.DATE
+      type: DataTypes.DATE,
+      allowNull: true
     },
     manual_operacao: {
-      type: DataTypes.TEXT
+      type: DataTypes.STRING(255),
+      allowNull: true
     },
     manual_manutencao: {
-      type: DataTypes.TEXT
+      type: DataTypes.STRING(255),
+      allowNull: true
     },
     especificacoes_tecnicas: {
-      type: DataTypes.TEXT
+      type: DataTypes.TEXT,
+      allowNull: true
     },
     observacoes: {
-      type: DataTypes.TEXT
+      type: DataTypes.TEXT,
+      allowNull: true
     },
     qr_code: {
-      type: DataTypes.STRING(500)
+      type: DataTypes.STRING(255),
+      allowNull: true
     },
     foto_principal: {
-      type: DataTypes.STRING(500)
+      type: DataTypes.STRING(255),
+      allowNull: true
     },
     responsavel_id: {
       type: DataTypes.INTEGER,
+      allowNull: true,
       references: {
         model: 'users',
         key: 'id'
@@ -198,53 +207,31 @@ module.exports = (sequelize) => {
     },
     setor_id: {
       type: DataTypes.INTEGER,
-  allowNull: false,
+      allowNull: false,
       references: {
         model: 'setores',
         key: 'id'
-      },
-      validate: {
-        isInt: {
-          msg: 'ID do setor deve ser um número inteiro'
-        }
       }
     },
     data_proxima_inspecao: {
-      type: DataTypes.DATE
+      type: DataTypes.DATE,
+      allowNull: true
     },
     horas_funcionamento: {
-      type: DataTypes.DECIMAL(12, 2),
-      defaultValue: 0.00,
-      validate: {
-        isDecimal: {
-          msg: 'Horas de funcionamento deve ser um número decimal válido'
-        }
-      }
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true
     },
     contador_producao: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-      validate: {
-        isInt: {
-          msg: 'Contador de produção deve ser um número inteiro'
-        }
-      }
+      type: DataTypes.DECIMAL(15, 2),
+      allowNull: true
     },
     ativo: {
       type: DataTypes.BOOLEAN,
-      defaultValue: true,
-      allowNull: false
+      defaultValue: true
     },
-    // Campos avançados para manutenção industrial
     vida_util_anos: {
       type: DataTypes.INTEGER,
-      allowNull: true,
-      validate: {
-        min: {
-          args: [1],
-          msg: 'Vida útil deve ser maior que zero'
-        }
-      }
+      allowNull: true
     },
     ultima_manutencao: {
       type: DataTypes.DATE,
@@ -256,225 +243,45 @@ module.exports = (sequelize) => {
     },
     intervalo_manutencao_dias: {
       type: DataTypes.INTEGER,
-      allowNull: true,
-      validate: {
-        min: {
-          args: [1],
-          msg: 'Intervalo de manutenção deve ser maior que zero'
-        }
-      }
+      allowNull: true
     },
     custo_manutencao_total: {
-      type: DataTypes.DECIMAL(15, 2),
-      defaultValue: 0.00,
-      validate: {
-        min: {
-          args: [0],
-          msg: 'Custo de manutenção não pode ser negativo'
-        }
-      }
+      type: DataTypes.DECIMAL(10, 2),
+      defaultValue: 0
     },
     mtbf_horas: {
       type: DataTypes.DECIMAL(10, 2),
-      allowNull: true,
-      comment: 'Mean Time Between Failures em horas'
+      allowNull: true
     },
     mttr_horas: {
-      type: DataTypes.DECIMAL(8, 2),
-      allowNull: true,
-      comment: 'Mean Time To Repair em horas'
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: true
     },
     historico_falhas: {
-      type: DataTypes.JSON,
-      allowNull: true,
-      comment: 'Histórico de falhas e reparos'
+      type: DataTypes.TEXT,
+      allowNull: true
     },
     parametros_operacao: {
-      type: DataTypes.JSON,
-      allowNull: true,
-      comment: 'Parâmetros normais de operação (temperatura, pressão, etc.)'
+      type: DataTypes.TEXT,
+      allowNull: true
     },
     documentos_anexos: {
-      type: DataTypes.JSON,
-      allowNull: true,
-      comment: 'Links para manuais, certificados e documentos'
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    deleted_at: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   }, {
+    sequelize,
     tableName: 'ativos',
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
-    hooks: {
-      beforeCreate: async (ativo) => {
-        // Gerar código patrimonial automaticamente se não fornecido
-        if (!ativo.codigo_patrimonio) {
-          const count = await Ativo.count();
-          ativo.codigo_patrimonio = `AT${String(count + 1).padStart(6, '0')}`;
-        }
-        
-        // Construir localização completa
-        ativo.localizacao_completa = [
-          ativo.predio,
-          ativo.andar,
-          ativo.sala,
-          ativo.posicao
-        ].filter(Boolean).join(' > ');
-        
-        // Gerar QR Code (URL será implementada posteriormente)
-        ativo.qr_code = `QR_${ativo.codigo_patrimonio}_${Date.now()}`;
-      },
-      
-      beforeUpdate: (ativo) => {
-        // Atualizar localização completa se mudou
-        if (ativo.changed('predio') || ativo.changed('andar') || 
-            ativo.changed('sala') || ativo.changed('posicao')) {
-          ativo.localizacao_completa = [
-            ativo.predio,
-            ativo.andar,
-            ativo.sala,
-            ativo.posicao
-          ].filter(Boolean).join(' > ');
-        }
-      }
-    }
+    paranoid: true,
+    deletedAt: 'deleted_at'
   });
-
-  // Definir associações
-  Ativo.associate = (models) => {
-    // Associação com categoria
-    Ativo.belongsTo(models.Category, {
-      foreignKey: 'categoria_id',
-      as: 'categoria',
-      onDelete: 'SET NULL'
-    });
-
-    // Associação com subcategoria
-    Ativo.belongsTo(models.SubCategory, {
-      foreignKey: 'subcategoria_id',
-      as: 'subcategoria',
-      onDelete: 'SET NULL'
-    });
-
-    // Associação com departamento
-    Ativo.belongsTo(models.Department, {
-      foreignKey: 'department_id',
-      as: 'department',
-      onDelete: 'SET NULL'
-    });
-
-    // Associação com responsável
-    Ativo.belongsTo(models.User, {
-      foreignKey: 'responsavel_id',
-      as: 'responsavel',
-      onDelete: 'SET NULL'
-    });
-
-    // Associação com setor
-    Ativo.belongsTo(models.Setor, {
-      foreignKey: 'setor_id',
-      as: 'setor',
-      onDelete: 'SET NULL'
-    });
-
-    // Associação com ordens de serviço
-    Ativo.hasMany(models.OrdemServico, {
-      foreignKey: 'ativo_id',
-      as: 'ordens_servico'
-    });
-
-    // Nota: Solicitações não têm referência direta a ativo_id
-    // A relação com ativos deve ser feita através de ordens de serviço
-  };
-
-  // Métodos da instância
-  Ativo.prototype.calcularIdade = function() {
-    if (!this.data_aquisicao) return null;
-    const agora = new Date();
-    const aquisicao = new Date(this.data_aquisicao);
-    const diffTime = Math.abs(agora - aquisicao);
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    return Math.floor(diffDays / 365.25); // Anos com ajuste para anos bissextos
-  };
-
-  Ativo.prototype.estaEmGarantia = function() {
-    if (!this.garantia_ate) return false;
-    return new Date() <= new Date(this.garantia_ate);
-  };
-
-  Ativo.prototype.precisaInspecao = function() {
-    if (!this.data_proxima_inspecao) return false;
-    const agora = new Date();
-    const proximaInspecao = new Date(this.data_proxima_inspecao);
-    const diasAte = Math.ceil((proximaInspecao - agora) / (1000 * 60 * 60 * 24));
-    return diasAte <= 7; // Alerta com 7 dias de antecedência
-  };
-
-  // Métodos estáticos
-  Ativo.buscarPorCodigo = async function(codigo) {
-    return await this.findOne({
-      where: { codigo_patrimonio: codigo },
-      include: ['categoria', 'subcategoria', 'department', 'responsavel']
-    });
-  };
-
-  Ativo.buscarPorCriticidade = async function(criticidade) {
-    return await this.findAll({
-      where: { 
-        criticidade: criticidade,
-        ativo: true 
-      },
-      include: ['categoria', 'department'],
-      order: [['nome', 'ASC']]
-    });
-  };
-
-  Ativo.buscarPorEstado = async function(estado) {
-    return await this.findAll({
-      where: { 
-        estado: estado,
-        ativo: true 
-      },
-      include: ['categoria', 'department'],
-      order: [['nome', 'ASC']]
-    });
-  };
-
-  // Definir associações
-  Ativo.associate = (models) => {
-    // Associações existentes
-    Ativo.belongsTo(models.Category, {
-      foreignKey: 'categoria_id',
-      as: 'categoria'
-    });
-
-    Ativo.belongsTo(models.SubCategory, {
-      foreignKey: 'subcategoria_id',
-      as: 'subcategoria'
-    });
-
-    Ativo.belongsTo(models.Department, {
-      foreignKey: 'department_id',
-      as: 'department'
-    });
-
-    Ativo.belongsTo(models.User, {
-      foreignKey: 'responsavel_id',
-      as: 'responsavel'
-    });
-
-    Ativo.belongsTo(models.Setor, {
-      foreignKey: 'setor_id',
-      as: 'setor'
-    });
-
-    // Nova associação com imagens
-    if (models.AtivoImagem) {
-      Ativo.hasMany(models.AtivoImagem, {
-        foreignKey: 'ativo_id',
-        as: 'imagens'
-      });
-    }
-  };
 
   return Ativo;
 };

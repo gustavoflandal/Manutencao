@@ -1,7 +1,67 @@
-const { DataTypes } = require('sequelize');
+const { Model, DataTypes } = require('sequelize');
+
+class CategoriaEstoque extends Model {
+  static associate(models) {
+    // Uma categoria pode ter muitos itens de estoque
+    this.hasMany(models.ItemEstoque, {
+      foreignKey: 'categoria_id',
+      as: 'itens',
+      onDelete: 'SET NULL'
+    });
+  }
+
+  // Métodos estáticos
+  static async buscarPorCodigo(codigo) {
+    return await this.findOne({
+      where: { 
+        codigo: codigo.toUpperCase(),
+        ativo: true 
+      },
+      include: [{
+        model: this.sequelize.models.ItemEstoque,
+        as: 'itens',
+        where: { ativo: true },
+        required: false
+      }]
+    });
+  }
+
+  static async listarAtivas() {
+    return await this.findAll({
+      where: { ativo: true },
+      order: [['nome', 'ASC']],
+      include: [{
+        model: this.sequelize.models.ItemEstoque,
+        as: 'itens',
+        attributes: ['id'],
+        where: { ativo: true },
+        required: false
+      }]
+    });
+  }
+
+  static async estatisticas() {
+    const total = await this.count({ where: { ativo: true } });
+    const comItens = await this.count({
+      where: { ativo: true },
+      include: [{
+        model: this.sequelize.models.ItemEstoque,
+        as: 'itens',
+        where: { ativo: true },
+        required: true
+      }]
+    });
+
+    return {
+      total_categorias: total,
+      categorias_com_itens: comItens,
+      categorias_sem_itens: total - comItens
+    };
+  }
+}
 
 module.exports = (sequelize) => {
-  const CategoriaEstoque = sequelize.define('CategoriaEstoque', {
+  CategoriaEstoque.init({
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -60,6 +120,7 @@ module.exports = (sequelize) => {
       defaultValue: true
     }
   }, {
+    sequelize,
     tableName: 'categorias_estoque',
     timestamps: true,
     createdAt: 'created_at',
@@ -81,65 +142,6 @@ module.exports = (sequelize) => {
       }
     }
   });
-
-  // Definir associações
-  CategoriaEstoque.associate = (models) => {
-    // Uma categoria pode ter muitos itens de estoque
-    CategoriaEstoque.hasMany(models.ItemEstoque, {
-      foreignKey: 'categoria_id',
-      as: 'itens',
-      onDelete: 'SET NULL'
-    });
-  };
-
-  // Métodos estáticos
-  CategoriaEstoque.buscarPorCodigo = async function(codigo) {
-    return await this.findOne({
-      where: { 
-        codigo: codigo.toUpperCase(),
-        ativo: true 
-      },
-      include: [{
-        model: sequelize.models.ItemEstoque,
-        as: 'itens',
-        where: { ativo: true },
-        required: false
-      }]
-    });
-  };
-
-  CategoriaEstoque.listarAtivas = async function() {
-    return await this.findAll({
-      where: { ativo: true },
-      order: [['nome', 'ASC']],
-      include: [{
-        model: sequelize.models.ItemEstoque,
-        as: 'itens',
-        attributes: ['id'],
-        where: { ativo: true },
-        required: false
-      }]
-    });
-  };
-
-  CategoriaEstoque.estatisticas = async function() {
-    const total = await this.count({ where: { ativo: true } });
-    const comItens = await this.count({
-      where: { ativo: true },
-      include: [{
-        model: sequelize.models.ItemEstoque,
-        as: 'itens',
-        where: { ativo: true },
-        required: true
-      }]
-    });
-
-    return {
-      total_categorias: total,
-      categorias_com_itens: comItens,
-      categorias_sem_itens: total - comItens
-    };
-  };
 
   return CategoriaEstoque;
 };
